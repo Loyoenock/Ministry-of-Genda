@@ -1,0 +1,6 @@
+{
+  "name": "MGLSD Labour Directorate – Diagnostic Interview Application",
+  "description": "Role-based diagnostic interview application for the TRANSFORMATIVE Programme, Ministry of Gender, Labour and Social Development (Uganda)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
