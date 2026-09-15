@@ -9,6 +9,15 @@ import { User, ShieldCheck, Mail, Phone, Building, Save, Check } from 'lucide-re
 
 export const ProfileView: React.FC = () => {
   const { user, updateProfile, role, switchRole } = useAuth();
+
+  if (!user) {
+    return (
+      <div className="p-8 text-center text-slate-500 text-xs">
+        No active profile found. Please sign in.
+      </div>
+    );
+  }
+
   const [fullName, setFullName] = useState(user.full_name);
   const [phone, setPhone] = useState(user.phone_number || '+256 772 458 921');
   const [department, setDepartment] = useState(user.department_unit);
@@ -35,18 +44,18 @@ export const ProfileView: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
-        <div className="flex items-center space-x-4 pb-6 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-3 sm:space-y-0 sm:space-x-4 pb-6 border-b border-slate-100 text-center sm:text-left">
           <img
             src={user.avatar_url}
             alt={user.full_name}
             referrerPolicy="no-referrer"
-            className="w-16 h-16 rounded-full object-cover ring-4 ring-teal-500/20"
+            className="w-16 h-16 rounded-full object-cover ring-4 ring-teal-500/20 shrink-0"
           />
           <div>
             <h2 className="text-lg font-bold text-slate-900">{user.full_name}</h2>
             <p className="text-xs text-slate-500">{user.email}</p>
-            <div className="mt-1 flex items-center space-x-2">
-              <span className="bg-teal-100 text-teal-800 text-[11px] font-bold px-2 py-0.5 rounded-full capitalize">
+            <div className="mt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              <span className="bg-teal-100 text-teal-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize">
                 {role} Role Active
               </span>
               <span className="text-[11px] text-slate-400">ID: {user.id}</span>
@@ -56,7 +65,7 @@ export const ProfileView: React.FC = () => {
 
         {savedMessage && (
           <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center space-x-2">
-            <Check className="w-4 h-4" />
+            <Check className="w-4 h-4 shrink-0" />
             <span>Profile credentials successfully updated.</span>
           </div>
         )}
@@ -69,7 +78,7 @@ export const ProfileView: React.FC = () => {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
               />
             </div>
 
@@ -79,7 +88,7 @@ export const ProfileView: React.FC = () => {
                 type="text"
                 disabled
                 value={user.email}
-                className="w-full px-3 py-2 border rounded-lg bg-slate-50 text-slate-500"
+                className="w-full px-3 py-2 border rounded-xl bg-slate-50 text-slate-500 min-h-[42px]"
               />
             </div>
 
@@ -89,7 +98,7 @@ export const ProfileView: React.FC = () => {
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
               />
             </div>
 
@@ -99,7 +108,7 @@ export const ProfileView: React.FC = () => {
                 type="text"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
               />
             </div>
           </div>
@@ -107,7 +116,7 @@ export const ProfileView: React.FC = () => {
           <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button
               type="submit"
-              className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl font-bold flex items-center space-x-2 transition"
+              className="w-full sm:w-auto px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl font-bold flex items-center justify-center space-x-2 transition min-h-[42px]"
             >
               <Save className="w-4 h-4" />
               <span>Save Profile Changes</span>
@@ -117,7 +126,7 @@ export const ProfileView: React.FC = () => {
       </div>
 
       {/* Role Demonstration Switcher Card */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 space-y-3">
+      <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 space-y-3">
         <div className="flex items-center space-x-2">
           <ShieldCheck className="w-5 h-5 text-teal-400" />
           <h3 className="font-bold text-sm">Security & Demonstration Persona Switcher</h3>
@@ -125,10 +134,10 @@ export const ProfileView: React.FC = () => {
         <p className="text-xs text-slate-300 leading-relaxed">
           Switch roles to experience how Row Level Security (RLS) dynamically filters the interface:
         </p>
-        <div className="grid grid-cols-2 gap-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <button
             onClick={() => switchRole('interviewer')}
-            className={`p-3 rounded-xl text-left border transition ${
+            className={`p-3.5 rounded-xl text-left border transition min-h-[44px] ${
               role === 'interviewer'
                 ? 'bg-teal-800/80 border-teal-400 text-white font-bold'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
@@ -140,7 +149,7 @@ export const ProfileView: React.FC = () => {
 
           <button
             onClick={() => switchRole('admin')}
-            className={`p-3 rounded-xl text-left border transition ${
+            className={`p-3.5 rounded-xl text-left border transition min-h-[44px] ${
               role === 'admin'
                 ? 'bg-purple-800/80 border-purple-400 text-white font-bold'
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'

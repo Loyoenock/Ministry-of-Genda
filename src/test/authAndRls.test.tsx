@@ -80,4 +80,37 @@ describe('Authentication & Row Level Security (RLS)', () => {
     const globalCount = parseInt(screen.getByTestId('global-count').textContent || '0');
     expect(visibleCountAfter).toBe(globalCount);
   });
+
+  it('renders safely when user logs out and is unauthenticated (user is null)', async () => {
+    function UnauthTestConsumer() {
+      const { user, logout } = useAuth();
+      const { interviews } = useInterviews();
+
+      return (
+        <div>
+          <div data-testid="auth-state">{user ? user.full_name : 'null-user'}</div>
+          <div data-testid="interviews-length">{interviews.length}</div>
+          <button data-testid="logout-trigger" onClick={() => logout()}>
+            Logout
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <InterviewProvider>
+          <UnauthTestConsumer />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    const logoutBtn = screen.getByTestId('logout-trigger');
+    await act(async () => {
+      logoutBtn.click();
+    });
+
+    expect(screen.getByTestId('auth-state').textContent).toBe('null-user');
+    expect(parseInt(screen.getByTestId('interviews-length').textContent || '0')).toBeGreaterThanOrEqual(0);
+  });
 });

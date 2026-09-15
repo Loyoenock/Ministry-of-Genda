@@ -151,7 +151,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // If Admin: sees everything
   const visibleInterviews = isAdmin
     ? allInterviews
-    : allInterviews.filter((it) => it.interviewer_id === user.id);
+    : allInterviews.filter((it) => user?.id ? it.interviewer_id === user.id : true);
 
   const activeInterview =
     allInterviews.find((it) => it.id === activeInterviewId) || null;

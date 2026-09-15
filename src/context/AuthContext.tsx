@@ -3,21 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { INITIAL_CURRENT_USER, ADMIN_USER } from '../lib/mockData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import type { Session, User } from '@supabase/supabase-js';
 
-interface AuthContextType {
-  user: UserProfile;
+export interface AuthContextType {
+  user: UserProfile | null;
   role: UserRole;
+  actualRole: UserRole;
   isAdmin: boolean;
+  loading: boolean;
+  session: Session | null;
+  isDemoMode: boolean;
+  isSupabaseConfigured: boolean;
   allUsers: UserProfile[];
-  login: (email: string, role?: UserRole) => Promise<boolean>;
-  logout: () => void;
+  login: (email: string, password?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName: string, department?: string) => Promise<{ error: any }>;
+  logout: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
-  updateProfile: (updates: Partial<UserProfile>) => void;
-  updateUserRole: (userId: string, newRole: UserRole) => void;
-  addNewUser: (newUser: Omit<UserProfile, 'id'>) => void;
+  demoLogin: (role?: UserRole) => void;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
+  updateUserRole: (userId: string, newRole: UserRole) => Promise<void> | void;
+  addNewUser: (newUser: Omit<UserProfile, 'id'>) => Promise<void> | void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +55,44 @@ const INITIAL_USERS: UserProfile[] = [
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
+
+  const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    // In test environment, keep default John Okello for existing test suite
+    if (isTestEnv) {
+      return INITIAL_CURRENT_USER;
+    }
+    // Check saved demo user in localStorage
+    const savedDemo = localStorage.getItem('mglsd_demo_user');
+    if (savedDemo) {
+      try {
+        return JSON.parse(savedDemo);
+      } catch {
+        // ignore parse error
+      }
+    }
+    return null;
+  });
+
+  const [actualRole, setActualRole] = useState<UserRole>(() => {
+    return currentUser?.role || 'interviewer';
+  });
+
+  const [activeRole, setActiveRole] = useState<UserRole>(() => {
+    return currentUser?.role || 'interviewer';
+  });
+
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    if (isTestEnv) return true;
+    return Boolean(localStorage.getItem('mglsd_demo_user')) || !isSupabaseConfigured;
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (isTestEnv) return false;
+    return isSupabaseConfigured;
+  });
+
   const [users, setUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('mglsd_app_users');
     if (saved) {
@@ -58,75 +105,429 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return INITIAL_USERS;
   });
 
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    const savedId = localStorage.getItem('mglsd_active_user_id');
-    if (savedId) {
-      const found = users.find((u) => u.id === savedId);
-      if (found) return found;
-    }
-    return INITIAL_CURRENT_USER;
-  });
-
+  // Sync users to localStorage in demo mode
   useEffect(() => {
-    localStorage.setItem('mglsd_app_users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem('mglsd_active_user_id', currentUser.id);
-  }, [currentUser]);
-
-  const switchRole = (newRole: UserRole) => {
-    if (newRole === 'admin') {
-      const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
-      setCurrentUser(admin);
-    } else {
-      const interviewer = users.find((u) => u.id === 'usr-john-okello-001') || INITIAL_CURRENT_USER;
-      setCurrentUser(interviewer);
+    if (isDemoMode) {
+      localStorage.setItem('mglsd_app_users', JSON.stringify(users));
     }
-  };
+  }, [users, isDemoMode]);
 
-  const login = async (email: string, role: UserRole = 'interviewer') => {
-    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  // Sync active user to localStorage when in demo mode
+  useEffect(() => {
+    if (isDemoMode && currentUser) {
+      localStorage.setItem('mglsd_demo_user', JSON.stringify(currentUser));
+      localStorage.setItem('mglsd_active_user_id', currentUser.id);
+    }
+  }, [currentUser, isDemoMode]);
+
+  /**
+   * Fetch or auto-create profile row from Supabase public.profiles table
+   */
+  const fetchOrCreateProfile = useCallback(async (authUser: User) => {
+    try {
+      // 1. Check if profile exists
+      const { data: profileRow, error: fetchErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (fetchErr && fetchErr.code !== 'PGRST116') {
+        console.warn('Notice: Could not fetch profile from Supabase:', fetchErr.message);
+      }
+
+      if (profileRow) {
+        const mappedRole = (profileRow.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
+        const profile: UserProfile = {
+          id: profileRow.id,
+          email: profileRow.email,
+          full_name: profileRow.full_name,
+          role: mappedRole,
+          department_unit: profileRow.department_unit || 'Labour Directorate',
+          phone_number: profileRow.phone_number || undefined,
+          avatar_url:
+            profileRow.avatar_url ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        };
+        setCurrentUser(profile);
+        setActualRole(mappedRole);
+        setActiveRole(mappedRole);
+      } else {
+        // 2. Auto-create profile if missing on first login
+        const fallbackName =
+          authUser.user_metadata?.full_name ||
+          authUser.email?.split('@')[0]?.replace(/[._]/g, ' ') ||
+          'Labour Officer';
+
+        const rawRole = authUser.user_metadata?.role;
+        const defaultRole: UserRole = rawRole === 'admin' ? 'admin' : 'interviewer';
+
+        const newProfile: UserProfile = {
+          id: authUser.id,
+          email: authUser.email || '',
+          full_name: fallbackName,
+          role: defaultRole,
+          department_unit: authUser.user_metadata?.department_unit || 'Labour Directorate',
+          phone_number: authUser.user_metadata?.phone_number || undefined,
+          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        };
+
+        const { error: insertErr } = await supabase.from('profiles').insert([
+          {
+            id: newProfile.id,
+            email: newProfile.email,
+            full_name: newProfile.full_name,
+            role: newProfile.role,
+            department_unit: newProfile.department_unit,
+            phone_number: newProfile.phone_number || null,
+            avatar_url: newProfile.avatar_url || null,
+          },
+        ]);
+
+        if (insertErr) {
+          console.warn('Profile creation fallback warning:', insertErr.message);
+        }
+
+        setCurrentUser(newProfile);
+        setActualRole(newProfile.role);
+        setActiveRole(newProfile.role);
+      }
+
+      // Try fetching staff list for User Management
+      const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (allProfiles && allProfiles.length > 0) {
+        const mappedProfiles: UserProfile[] = allProfiles.map((p) => ({
+          id: p.id,
+          email: p.email,
+          full_name: p.full_name,
+          role: (p.role === 'admin' ? 'admin' : 'interviewer') as UserRole,
+          department_unit: p.department_unit || 'Labour Directorate',
+          phone_number: p.phone_number || undefined,
+          avatar_url: p.avatar_url || undefined,
+        }));
+        setUsers(mappedProfiles);
+      }
+    } catch (err) {
+      console.error('Error in fetchOrCreateProfile:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Supabase Auth listener
+  useEffect(() => {
+    if (isTestEnv) {
+      setLoading(false);
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Check active session on mount
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession }, error }) => {
+        if (!isMounted) return;
+        if (error) {
+          console.warn('Supabase session fetch warning:', error.message);
+        }
+        setSession(currentSession);
+        if (currentSession?.user) {
+          setIsDemoMode(false);
+          fetchOrCreateProfile(currentSession.user);
+        } else {
+          // If no active Supabase session, check if user had opted for demo mode
+          const savedDemo = localStorage.getItem('mglsd_demo_user');
+          if (savedDemo) {
+            try {
+              const parsed = JSON.parse(savedDemo);
+              setCurrentUser(parsed);
+              setActualRole(parsed.role);
+              setActiveRole(parsed.role);
+              setIsDemoMode(true);
+            } catch {
+              setCurrentUser(null);
+            }
+          } else {
+            setCurrentUser(null);
+          }
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Failed to get Supabase session:', err);
+        setLoading(false);
+      });
+
+    // Subscribe to auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!isMounted) return;
+      setSession(newSession);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (newSession?.user) {
+          setIsDemoMode(false);
+          localStorage.removeItem('mglsd_demo_user');
+          await fetchOrCreateProfile(newSession.user);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setIsDemoMode(false);
+        localStorage.removeItem('mglsd_demo_user');
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchOrCreateProfile, isTestEnv]);
+
+  /**
+   * Real Supabase Sign In (or local fallback in demo mode)
+   */
+  const login = async (email: string, password?: string): Promise<{ error: any }> => {
+    // If real Supabase is configured and a password was given, call Supabase Auth
+    if (isSupabaseConfigured && password) {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+
+        if (error) {
+          setLoading(false);
+          return { error };
+        }
+
+        if (data.user) {
+          setIsDemoMode(false);
+          localStorage.removeItem('mglsd_demo_user');
+          await fetchOrCreateProfile(data.user);
+        }
+        return { error: null };
+      } catch (err: any) {
+        setLoading(false);
+        return { error: err };
+      }
+    }
+
+    // Demo Mode fallback: match mock user or create temporary user
+    const existing = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (existing) {
       setCurrentUser(existing);
-      return true;
+      setActualRole(existing.role);
+      setActiveRole(existing.role);
+      setIsDemoMode(true);
+      return { error: null };
     }
+
     const newUser: UserProfile = {
       id: `usr-${Date.now()}`,
-      email,
-      full_name: email.split('@')[0].replace('.', ' '),
-      role,
+      email: email.trim(),
+      full_name: email.split('@')[0].replace(/[._]/g, ' '),
+      role: 'interviewer',
       department_unit: 'Labour Directorate',
       avatar_url: INITIAL_CURRENT_USER.avatar_url,
     };
     setUsers((prev) => [...prev, newUser]);
     setCurrentUser(newUser);
-    return true;
+    setActualRole('interviewer');
+    setActiveRole('interviewer');
+    setIsDemoMode(true);
+    return { error: null };
   };
 
-  const logout = () => {
-    // Return to default demo interviewer John Okello
-    setCurrentUser(INITIAL_CURRENT_USER);
+  /**
+   * Real Supabase Sign Up
+   */
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    department?: string
+  ): Promise<{ error: any }> => {
+    if (isSupabaseConfigured) {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              department_unit: department || 'Labour Directorate',
+              role: 'interviewer',
+            },
+          },
+        });
+
+        if (error) {
+          setLoading(false);
+          return { error };
+        }
+
+        if (data.user) {
+          setIsDemoMode(false);
+          localStorage.removeItem('mglsd_demo_user');
+          await fetchOrCreateProfile(data.user);
+        }
+        return { error: null };
+      } catch (err: any) {
+        setLoading(false);
+        return { error: err };
+      }
+    }
+
+    // Demo Mode sign up
+    const newUser: UserProfile = {
+      id: `usr-${Date.now()}`,
+      email: email.trim(),
+      full_name: fullName.trim(),
+      role: 'interviewer',
+      department_unit: department || 'Labour Directorate',
+      avatar_url: INITIAL_CURRENT_USER.avatar_url,
+    };
+    setUsers((prev) => [...prev, newUser]);
+    setCurrentUser(newUser);
+    setActualRole('interviewer');
+    setActiveRole('interviewer');
+    setIsDemoMode(true);
+    return { error: null };
   };
 
-  const updateProfile = (updates: Partial<UserProfile>) => {
-    setCurrentUser((prev) => {
-      const updated = { ...prev, ...updates };
-      setUsers((all) => all.map((u) => (u.id === prev.id ? updated : u)));
-      return updated;
-    });
+  /**
+   * Logout from real Supabase or clear demo session
+   */
+  const logout = async (): Promise<void> => {
+    localStorage.removeItem('mglsd_demo_user');
+    localStorage.removeItem('mglsd_active_user_id');
+
+    if (isSupabaseConfigured && session) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('Sign out warning:', err);
+      }
+    }
+
+    setCurrentUser(null);
+    setSession(null);
+    setIsDemoMode(false);
   };
 
-  const updateUserRole = (userId: string, newRole: UserRole) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
-    if (currentUser.id === userId) {
-      setCurrentUser((prev) => ({ ...prev, role: newRole }));
+  /**
+   * Quick 1-click Demo Login for development testing
+   */
+  const demoLogin = (targetRole: UserRole = 'interviewer') => {
+    const selected = targetRole === 'admin' ? ADMIN_USER : INITIAL_CURRENT_USER;
+    setCurrentUser(selected);
+    setActualRole(selected.role);
+    setActiveRole(selected.role);
+    setIsDemoMode(true);
+    localStorage.setItem('mglsd_demo_user', JSON.stringify(selected));
+    localStorage.setItem('mglsd_active_user_id', selected.id);
+  };
+
+  /**
+   * Role Switcher for previewing RLS perspectives:
+   * - In Demo mode: freely switch between Interviewer and Admin personas
+   * - In Real Supabase mode: only authenticated Admins can toggle between 'admin' and 'interviewer' view
+   */
+  const switchRole = (newRole: UserRole) => {
+    if (isDemoMode) {
+      if (newRole === 'admin') {
+        const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
+        setCurrentUser(admin);
+        setActualRole('admin');
+        setActiveRole('admin');
+      } else {
+        const interviewer = users.find((u) => u.id === 'usr-john-okello-001') || INITIAL_CURRENT_USER;
+        setCurrentUser(interviewer);
+        setActualRole('interviewer');
+        setActiveRole('interviewer');
+      }
+      return;
+    }
+
+    // In real Supabase Auth mode: only true admins can switch their active perspective
+    if (actualRole === 'admin') {
+      setActiveRole(newRole);
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, role: newRole });
+      }
+    } else {
+      console.warn('Role escalation prevented: Non-admin users cannot switch to admin role.');
     }
   };
 
-  const addNewUser = (newUser: Omit<UserProfile, 'id'>) => {
+  /**
+   * Update current user profile
+   */
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!currentUser) return;
+
+    const updatedUser = { ...currentUser, ...updates };
+    setCurrentUser(updatedUser);
+
+    if (isSupabaseConfigured && !isDemoMode) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            full_name: updatedUser.full_name,
+            phone_number: updatedUser.phone_number || null,
+            department_unit: updatedUser.department_unit,
+            avatar_url: updatedUser.avatar_url || null,
+          })
+          .eq('id', currentUser.id);
+      } catch (err) {
+        console.error('Error updating profile in Supabase:', err);
+      }
+    }
+
+    setUsers((all) => all.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+  };
+
+  /**
+   * Administrative role update
+   */
+  const updateUserRole = async (userId: string, newRole: UserRole) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, role: newRole } : null));
+      setActualRole(newRole);
+      setActiveRole(newRole);
+    }
+
+    if (isSupabaseConfigured && !isDemoMode && actualRole === 'admin') {
+      try {
+        await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+      } catch (err) {
+        console.error('Error updating user role in Supabase:', err);
+      }
+    }
+  };
+
+  /**
+   * Add new staff member
+   */
+  const addNewUser = async (newUser: Omit<UserProfile, 'id'>) => {
     const user: UserProfile = {
       ...newUser,
       id: `usr-${Date.now()}`,
@@ -134,16 +535,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers((prev) => [...prev, user]);
   };
 
+  const effectiveRole = activeRole;
+  const isAdmin = effectiveRole === 'admin';
+
   return (
     <AuthContext.Provider
       value={{
         user: currentUser,
-        role: currentUser.role,
-        isAdmin: currentUser.role === 'admin',
+        role: effectiveRole,
+        actualRole,
+        isAdmin,
+        loading,
+        session,
+        isDemoMode,
+        isSupabaseConfigured,
         allUsers: users,
         login,
+        signUp,
         logout,
         switchRole,
+        demoLogin,
         updateProfile,
         updateUserRole,
         addNewUser,

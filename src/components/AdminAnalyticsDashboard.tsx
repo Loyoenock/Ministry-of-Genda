@@ -169,10 +169,10 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 w-full sm:w-auto">
           <button
             onClick={handleExportJSON}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-2 shadow-xs"
+            className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs min-h-[42px]"
           >
             <Download className="w-4 h-4" />
             <span>Export Raw Data (JSON)</span>
@@ -181,48 +181,48 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
       </div>
 
       {/* Aggregate Quantitative Baseline Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Diagnostic Interviews</span>
-            <Building className="w-5 h-5 text-purple-600" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Interviews</span>
+            <Building className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
           </div>
-          <p className="text-3xl font-extrabold text-slate-900 mt-2">{totalInterviews}</p>
-          <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-            <span className="text-emerald-600 font-bold">{completed} Completed</span>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{totalInterviews}</p>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 mt-1">
+            <span className="text-emerald-600 font-bold">{completed} Done</span>
             <span>•</span>
-            <span className="text-blue-600 font-bold">{inProgress} In Progress</span>
+            <span className="text-blue-600 font-bold">{inProgress} Active</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Reported Directorate Staff</span>
-            <Users className="w-5 h-5 text-teal-600" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Staff Count</span>
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600" />
           </div>
-          <p className="text-3xl font-extrabold text-slate-900 mt-2">{aggregateMetrics.totalStaffCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Covering HQ & 14 Regional/District Outposts</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{aggregateMetrics.totalStaffCount}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 truncate">HQ & 14 Outposts</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Workplace Inspections Logged</span>
-            <FileCheck className="w-5 h-5 text-blue-600" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Inspections</span>
+            <FileCheck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
           </div>
-          <p className="text-3xl font-extrabold text-slate-900 mt-2">{aggregateMetrics.totalInspections.toLocaleString()}</p>
-          <p className="text-xs text-slate-500 mt-1">Annual baseline across formal workplaces</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{aggregateMetrics.totalInspections.toLocaleString()}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 truncate">Annual baseline</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dispute Resolution Rate</span>
-            <Scale className="w-5 h-5 text-amber-600" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Resolution Rate</span>
+            <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
           </div>
-          <p className="text-3xl font-extrabold text-slate-900 mt-2">
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
             {Math.round((aggregateMetrics.disputesResolved / aggregateMetrics.disputesLogged) * 100)}%
           </p>
-          <p className="text-xs text-slate-500 mt-1">
-            {aggregateMetrics.disputesResolved} resolved of {aggregateMetrics.disputesLogged} disputes
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 truncate">
+            {aggregateMetrics.disputesResolved} of {aggregateMetrics.disputesLogged}
           </p>
         </div>
       </div>
@@ -230,7 +230,7 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
       {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tier Completion Performance */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs min-w-0">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm sm:text-base font-bold text-slate-900">
@@ -238,17 +238,17 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
               </h3>
               <p className="text-xs text-slate-500">Breakdown of assigned and completed sessions</p>
             </div>
-            <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-semibold">
-              4 Tier Levels
+            <span className="text-[11px] sm:text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-semibold shrink-0">
+              4 Tiers
             </span>
           </div>
 
-          <div className="h-64">
+          <div className="h-64 sm:h-72 w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={tierData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+              <BarChart data={tierData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="tier" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="tier" tick={{ fontSize: 10 }} interval={0} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#0f172a',
@@ -265,24 +265,24 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
         </div>
 
         {/* Institutional Maturity Signals (Radar Chart) */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs min-w-0">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                Institutional Maturity Signals (Diagnostic Scale 1–5)
+                Institutional Maturity Signals (1–5)
               </h3>
               <p className="text-xs text-slate-500">Average cross-departmental diagnostic rating</p>
             </div>
-            <span className="text-xs bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg font-bold">
+            <span className="text-[11px] sm:text-xs bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg font-bold shrink-0">
               Radar Evaluation
             </span>
           </div>
 
-          <div className="h-64">
+          <div className="h-64 sm:h-72 w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={maturityData} cx="50%" cy="50%" outerRadius="75%">
+              <RadarChart data={maturityData} cx="50%" cy="50%" outerRadius="68%">
                 <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="domain" tick={{ fontSize: 10, fill: '#475569' }} />
+                <PolarAngleAxis dataKey="domain" tick={{ fontSize: 9, fill: '#475569' }} />
                 <PolarRadiusAxis angle={30} domain={[0, 5]} tick={{ fontSize: 9 }} />
                 <Radar
                   name="Maturity Rating"

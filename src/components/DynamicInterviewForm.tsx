@@ -171,29 +171,29 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
   return (
     <div className="max-w-[1600px] mx-auto p-4 sm:p-6 space-y-6">
       {/* Sticky Header Banner: Interviewee Details, Tier Badge, Auto-Save Status, Progress */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-6 sticky top-18 z-20 backdrop-blur-md bg-white/95">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5 sm:p-6 sticky top-16 z-20 backdrop-blur-md bg-white/95">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-start space-x-3">
             <button
               onClick={onBack}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition shrink-0 mt-1"
+              className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition shrink-0 mt-0.5 min-h-[42px] min-w-[42px] flex items-center justify-center"
               title="Return to list"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">
                   {interview.interviewee_name}
                 </h1>
-                <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-medium">
+                <span className="text-[11px] sm:text-xs bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-medium">
                   {interview.role_title}
                 </span>
-                <span className="text-xs bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-0.5 rounded-full font-bold">
+                <span className="text-[11px] sm:text-xs bg-teal-100 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-full font-bold">
                   Tier: {interview.tier}
                 </span>
                 <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                  className={`text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold ${
                     interview.status === 'Completed'
                       ? 'bg-emerald-100 text-emerald-800'
                       : interview.status === 'In Progress'
@@ -204,16 +204,16 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                   {interview.status}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
                 {interview.department_unit} • {interview.location} • Conducted by {interview.interviewer_name} ({interview.interview_date})
               </p>
             </div>
           </div>
 
           {/* Right Action Tools: Auto-save status, status toggle, print/export */}
-          <div className="flex items-center space-x-3 shrink-0 self-end lg:self-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:space-x-3 shrink-0">
             {/* Auto Save Indicator */}
-            <div className="flex items-center space-x-1.5 text-xs text-slate-500 px-2.5 py-1 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center space-x-1.5 text-xs text-slate-500 px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200 min-h-[38px]">
               {autoSaveStatus === 'saving' ? (
                 <>
                   <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" />
@@ -222,7 +222,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
               ) : (
                 <>
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-medium">Saved (Draft)</span>
+                  <span className="text-emerald-700 font-medium">Saved</span>
                 </>
               )}
             </div>
@@ -231,7 +231,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             <select
               value={interview.status}
               onChange={(e) => updateInterview(interview.id, { status: e.target.value as any })}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-2 focus:ring-teal-500"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 min-h-[38px]"
             >
               <option value="Draft">Draft</option>
               <option value="In Progress">In Progress</option>
@@ -241,7 +241,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             {onOpenExport && (
               <button
                 onClick={onOpenExport}
-                className="p-2 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                className="p-2 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition min-h-[38px] min-w-[38px] flex items-center justify-center"
                 title="Export / Print Diagnostic Brief"
               >
                 <Printer className="w-4 h-4" />
@@ -251,19 +251,19 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
         </div>
 
         {/* Diagnostic Progress Bar */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center space-x-3 text-xs">
+        <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className="font-bold text-slate-700">Form Progress:</span>
-            <span className="text-slate-500">
-              {answeredCount} of {applicableQuestions.length} questions answered ({overallPercentage}%)
+            <span className="text-slate-600">
+              {answeredCount}/{applicableQuestions.length} answered ({overallPercentage}%)
             </span>
-            <span className="text-slate-300">•</span>
+            <span className="text-slate-300 hidden sm:inline">•</span>
             <span className="text-slate-500">
-              {collectedDocsCount} of 20 statutory documents collected
+              {collectedDocsCount}/20 docs
             </span>
           </div>
 
-          <div className="w-full sm:w-64 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full sm:w-64 h-2.5 bg-slate-100 rounded-full overflow-hidden shrink-0">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
                 overallPercentage === 100
@@ -278,41 +278,41 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
         </div>
 
         {/* Top-Level Tabs: Questionnaire | Documents Checklist (20 items) | Interviewer Notes */}
-        <div className="flex space-x-2 mt-4 pt-2 border-t border-slate-100 overflow-x-auto">
+        <div className="flex space-x-1.5 sm:space-x-2 mt-3 sm:mt-4 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('questionnaire')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 min-h-[40px] ${
               activeTab === 'questionnaire'
                 ? 'bg-teal-700 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>Diagnostic Questions ({applicableQuestions.length})</span>
+            <FileText className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">Diagnostic Questions ({applicableQuestions.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('documents')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 min-h-[40px] ${
               activeTab === 'documents'
                 ? 'bg-teal-700 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <FileCheck className="w-4 h-4" />
-            <span>Supporting Documents ({collectedDocsCount}/20 Collected)</span>
+            <FileCheck className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">Supporting Documents ({collectedDocsCount}/20)</span>
           </button>
 
           <button
             onClick={() => setActiveTab('notes')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 min-h-[40px] ${
               activeTab === 'notes'
                 ? 'bg-teal-700 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <ClipboardList className="w-4 h-4" />
-            <span>Post-Interview Notes & Maturity</span>
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">Notes & Maturity</span>
           </button>
         </div>
       </div>
@@ -321,9 +321,49 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
       {/* TAB 1: QUESTIONNAIRE VIEW */}
       {/* ========================================================================= */}
       {activeTab === 'questionnaire' && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          {/* Left Column: Sticky Section Navigation */}
-          <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 sticky top-60 space-y-2">
+        <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-6 items-start">
+          {/* Mobile / Tablet Horizontal Section Picker (< lg) */}
+          <div className="block lg:hidden bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Jump to Section
+              </span>
+              <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded">
+                Section {applicableSections.findIndex((s) => s.code === activeSectionCode) + 1} of {applicableSections.length}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar">
+              {applicableSections.map((sec) => {
+                const isCurrent = sec.code === activeSectionCode;
+                const secQuestions = applicableQuestions.filter((q) => q.section_code === sec.code);
+                const secAnswered = secQuestions.filter(
+                  (q) => (localAnswers[q.id] || '').trim().length > 0
+                ).length;
+                const isComplete = secAnswered === secQuestions.length && secQuestions.length > 0;
+                return (
+                  <button
+                    key={sec.code}
+                    onClick={() => setActiveSectionCode(sec.code)}
+                    className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 min-h-[42px] ${
+                      isCurrent
+                        ? 'bg-teal-700 text-white shadow-xs'
+                        : isComplete
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>Sec {sec.code}</span>
+                    <span className={`text-[10px] ${isCurrent ? 'text-teal-200' : 'text-slate-500'}`}>
+                      ({secAnswered}/{secQuestions.length})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Left Column: Sticky Section Navigation (Desktop >= lg) */}
+          <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 sticky top-60 space-y-2">
             <div className="pb-2 border-b border-slate-100 flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Sections ({applicableSections.length})
@@ -385,7 +425,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           </div>
 
           {/* Right Column: Questions List for the active section */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="w-full lg:col-span-3 space-y-6">
             {/* Active Section Header Card */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5">
               <div className="flex items-center space-x-3">
@@ -493,7 +533,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             </div>
 
             {/* Section Pagination Buttons */}
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-2">
               {(() => {
                 const currentIdx = applicableSections.findIndex((s) => s.code === activeSectionCode);
                 const prevSec = applicableSections[currentIdx - 1];
@@ -504,7 +544,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                     <button
                       disabled={!prevSec}
                       onClick={() => prevSec && setActiveSectionCode(prevSec.code)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition ${
+                      className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[40px] ${
                         prevSec
                           ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           : 'opacity-40 text-slate-400 cursor-not-allowed'
@@ -514,14 +554,14 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                       <span>Previous: {prevSec ? prevSec.code : 'Start'}</span>
                     </button>
 
-                    <span className="text-xs font-semibold text-slate-500">
+                    <span className="text-xs font-semibold text-slate-500 order-last sm:order-none w-full sm:w-auto text-center sm:text-left py-1 sm:py-0">
                       Section {currentIdx + 1} of {applicableSections.length}
                     </span>
 
                     <button
                       disabled={!nextSec}
                       onClick={() => nextSec && setActiveSectionCode(nextSec.code)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition ${
+                      className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[40px] ${
                         nextSec
                           ? 'bg-teal-700 text-white hover:bg-teal-800'
                           : 'opacity-40 text-slate-400 cursor-not-allowed'
@@ -562,7 +602,140 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card Checklist (< md) */}
+          <div className="block md:hidden space-y-3">
+            {checklist.map((item) => (
+              <div key={item.id} className="p-4 rounded-xl border border-slate-200/90 bg-slate-50/40 space-y-3 hover:bg-slate-50/80 transition">
+                {/* Header: Item # + Title */}
+                <div className="flex items-start space-x-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    {item.item_number}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                      {item.document_title}
+                    </h3>
+                    <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded mt-1">
+                      {item.category}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Dropdowns: Exists & Collected (42px min height) */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Exists?
+                    </label>
+                    <select
+                      value={item.exists_status}
+                      onChange={(e) =>
+                        updateChecklistItem(interview.id, item.item_number, {
+                          exists_status: e.target.value as ExistsStatus,
+                        })
+                      }
+                      className="w-full text-xs border border-slate-300 rounded-xl px-2.5 py-2.5 bg-white font-medium outline-none focus:ring-2 focus:ring-teal-500 min-h-[42px]"
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Unknown">Unknown</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Collected?
+                    </label>
+                    <select
+                      value={item.collected_status}
+                      onChange={(e) =>
+                        updateChecklistItem(interview.id, item.item_number, {
+                          collected_status: e.target.value as CollectedStatus,
+                        })
+                      }
+                      className={`w-full text-xs border rounded-xl px-2.5 py-2.5 font-bold outline-none focus:ring-2 focus:ring-teal-500 min-h-[42px] ${
+                        item.collected_status === 'Collected'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                          : item.collected_status === 'Pending'
+                          ? 'bg-amber-50 border-amber-300 text-amber-800'
+                          : 'bg-slate-50 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <option value="Collected">Collected</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Refused">Refused</option>
+                      <option value="N/A">N/A</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Verification Notes */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Verification Notes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Reviewed 2024 annual copy..."
+                    value={item.notes}
+                    onChange={(e) =>
+                      updateChecklistItem(interview.id, item.item_number, { notes: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* Follow-up Action */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Follow-up Action
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Request stamped copy from Commissioner..."
+                    value={item.follow_up_action}
+                    onChange={(e) =>
+                      updateChecklistItem(interview.id, item.item_number, {
+                        follow_up_action: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+
+                {/* File Attachment / Upload */}
+                <div className="pt-1">
+                  {item.file_name ? (
+                    <div className="flex items-center space-x-2 text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-xs font-semibold">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="truncate flex-1" title={item.file_name}>
+                        {item.file_name}
+                      </span>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex items-center justify-center space-x-2 w-full py-2.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition min-h-[42px] shadow-2xs">
+                      <Upload className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Attach Document File</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadDocumentFile(interview.id, item.item_number, file.name);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[11px] border-b border-slate-200">
                 <tr>
@@ -872,7 +1045,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
               {[
                 { key: 'governance_score', label: '1. Governance & Oversight' },
                 { key: 'technology_score', label: '2. Information Systems & IT' },
@@ -892,7 +1065,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                             key={num}
                             type="button"
                             onClick={() => handleMaturityScoreChange(domain.key, num)}
-                            className={`w-6 h-6 rounded text-xs font-bold transition ${
+                            className={`w-7 h-7 sm:w-6 sm:h-6 rounded text-xs font-bold transition flex items-center justify-center min-h-[28px] min-w-[28px] ${
                               currentScore === num
                                 ? 'bg-teal-700 text-white shadow-xs'
                                 : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'

@@ -31,7 +31,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
   const [interviewDate, setInterviewDate] = useState('16 Sep 2025');
   const [interviewTime, setInterviewTime] = useState('10:00 AM');
   const [location, setLocation] = useState('Ministry Headquarters, Kampala');
-  const [assignedInterviewerId, setAssignedInterviewerId] = useState(user.id);
+  const [assignedInterviewerId, setAssignedInterviewerId] = useState(user?.id || 'usr-john-okello-001');
   const [validationError, setValidationError] = useState('');
 
   if (!isOpen) return null;
@@ -87,8 +87,8 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
       interview_date: interviewDate,
       interview_time: interviewTime,
       location: location.trim(),
-      interviewer_id: assignedInterviewer.id,
-      interviewer_name: assignedInterviewer.full_name,
+      interviewer_id: assignedInterviewer?.id || user?.id || 'usr-john-okello-001',
+      interviewer_name: assignedInterviewer?.full_name || user?.full_name || 'Assigned Officer',
       tier,
       status: 'Draft',
       duration_min: 60,
@@ -99,31 +99,31 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in fade-in-50 zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in-50 zoom-in-95 duration-200">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-[#0b132b] text-white flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-lg bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300">
-              <UserPlus className="w-5 h-5" />
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-[#0b132b] text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300 shrink-0">
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight">Schedule New Diagnostic Interview</h2>
-              <p className="text-xs text-slate-300">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold tracking-tight truncate">Schedule Diagnostic Interview</h2>
+              <p className="text-[10px] sm:text-xs text-slate-300 truncate">
                 TRANSFORMATIVE Programme • MGLSD Labour Directorate
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition min-h-[38px] min-w-[38px] flex items-center justify-center shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           {validationError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
               {validationError}
@@ -135,7 +135,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
               1. Interviewee Profile
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
               <div>
                 <label className="block text-xs text-slate-600 font-medium mb-1">
                   Full Name <span className="text-red-500">*</span>
@@ -149,13 +149,13 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                     setIntervieweeName(e.target.value);
                     setValidationError('');
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[42px]"
                 />
               </div>
 
               <div>
                 <label className="block text-xs text-slate-600 font-medium mb-1">
-                  Role / Official Designation <span className="text-red-500">*</span>
+                  Role / Designation <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -166,7 +166,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                     setRoleTitle(e.target.value);
                     setValidationError('');
                   }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[42px]"
                 />
               </div>
 
@@ -179,7 +179,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   placeholder="e.g. Department of OSH"
                   value={departmentUnit}
                   onChange={(e) => setDepartmentUnit(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[42px]"
                 />
               </div>
 
@@ -193,7 +193,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   min="0.1"
                   value={yearsInRole}
                   onChange={(e) => setYearsInRole(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none min-h-[42px]"
                 />
               </div>
             </div>
@@ -203,12 +203,12 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                2. Interview Tier (Governs Dynamic Questions) <span className="text-red-500">*</span>
+                2. Tier (Governs Dynamic Questions) <span className="text-red-500">*</span>
               </label>
-              <span className="text-[11px] text-teal-700 font-medium">Automatic section routing</span>
+              <span className="text-[10px] sm:text-[11px] text-teal-700 font-medium">Auto section routing</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
               {(['Leadership', 'Management', 'Frontline', 'Support/IT'] as InterviewTier[]).map((t) => {
                 const info = tierInfo[t];
                 const isSelected = tier === t;
@@ -217,7 +217,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                     key={t}
                     type="button"
                     onClick={() => setTier(t)}
-                    className={`p-3 text-left rounded-xl border-2 transition-all flex flex-col justify-between relative ${
+                    className={`p-3 text-left rounded-xl border-2 transition-all flex flex-col justify-between relative min-h-[44px] ${
                       isSelected
                         ? 'border-teal-600 bg-teal-50/50 shadow-sm'
                         : 'border-slate-200 hover:border-slate-300 bg-white'
@@ -226,7 +226,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900">{info.title}</span>
                       {isSelected && (
-                        <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center shrink-0 ml-1">
                           <Check className="w-3 h-3" />
                         </div>
                       )}
@@ -253,7 +253,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   type="text"
                   value={interviewDate}
                   onChange={(e) => setInterviewDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
                 />
               </div>
 
@@ -263,7 +263,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   type="text"
                   value={interviewTime}
                   onChange={(e) => setInterviewTime(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
                 />
               </div>
 
@@ -273,7 +273,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
                 />
               </div>
             </div>
@@ -286,7 +286,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                 <select
                   value={assignedInterviewerId}
                   onChange={(e) => setAssignedInterviewerId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white min-h-[42px]"
                 >
                   {allUsers.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -299,17 +299,17 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
           </div>
 
           {/* Modal Footer Actions */}
-          <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-3">
+          <div className="pt-3 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:space-x-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition min-h-[42px]"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 rounded-lg shadow-sm transition flex items-center space-x-1.5"
+              className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5 min-h-[42px]"
             >
               <span>Initialize Diagnostic Interview</span>
               <ChevronRight className="w-4 h-4" />
