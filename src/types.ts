@@ -33,6 +33,7 @@ export interface Question {
   applicable_tiers: InterviewTier[];
   response_type: 'text' | 'structured' | 'composite';
   sort_order: number;
+  statutory_reference?: string;
 }
 
 export interface Answer {

@@ -15,6 +15,14 @@ import {
 import { STATUTORY_DOCUMENTS_CATALOGUE } from './questionsData';
 import { createInitialNotes } from './mockData';
 
+export {
+  fetchQuestionsFromSupabase,
+  mapRowToQuestion,
+  getCachedOrFallbackQuestions,
+  updateQuestionsCache,
+  clearQuestionsCache,
+} from './questionsService';
+
 export const isUuid = (val?: string | null): boolean => {
   if (!val) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);

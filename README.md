@@ -86,6 +86,13 @@ Triggered when `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` are missing, empt
 | `mglsd_checklists` | `Record<string, DocumentItem[]>` | 20-item statutory checklist states by `interview_id` |
 | `mglsd_notes` | `Record<string, InterviewerNote>` | Observation notes mapped by `interview_id` |
 | `mglsd_activities` | `RecentActivityItem[]` | System audit log of created/updated interviews |
+| `mglsd_questions_cache` | `Question[]` | Cached master questions catalogue loaded from Supabase |
+
+### Dynamic Questions Loading & Single Source of Truth
+The canonical source of truth for the master diagnostic questions catalogue is the PostgreSQL database (`public.questions` table seeded by `supabase/seed.sql`).
+- **Runtime Loading**: In Supabase mode, questions are loaded at runtime via `fetchQuestionsFromSupabase()` in `src/lib/questionsService.ts` and cached in memory and `localStorage`.
+- **Zero-Drift**: Adding or modifying questions is done centrally in `supabase/seed.sql` rather than hardcoding in frontend files.
+- **Offline & Demo Fallback**: When `isSupabaseConfigured` is false or during offline field operation, the service falls back gracefully to cached questions or the verified demo catalogue in `src/lib/questionsData.ts`. Tier filtering (`getQuestionsForTier`) and section navigation (`getSectionsForTier`) remain 100% operational across all tiers.
 
 ### 2. Real Supabase Mode
 Triggered when valid `VITE_SUPABASE_URL` (starting with `https://`) and `VITE_SUPABASE_ANON_KEY` are supplied in `.env`.
@@ -367,7 +374,7 @@ During recent architectural audits, the following areas were identified for futu
 2. **Duplicated Questions Catalogue**:
    - The diagnostic questions exist in both TypeScript (`src/lib/questionsData.ts`) and SQL (`supabase/seed.sql`). An update in the question text or hints must currently be synchronized across both files. A future enhancement should fetch questions directly from Supabase with local IndexedDB caching.
 3. **Unused Dependencies in `package.json`**:
-   - `@google/genai`, `express`, and `dotenv` remain in `package.json` from earlier template iterations. These are not required for client-side Vite builds and can be safely pruned in future cleanup tasks.
+   - Residual dependencies (`@google/genai`, `express`, `dotenv`, `@types/express`) have been cleanly removed from `package.json` and lockfiles.
 4. **Offline Document Upload Queueing**:
    - In Demo Mode, document uploads store mock metadata without persisting raw binary data to localStorage to prevent quota exhaustion (`QUOTA_EXCEEDED_ERR`).
 

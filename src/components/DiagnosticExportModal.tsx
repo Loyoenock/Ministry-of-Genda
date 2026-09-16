@@ -6,7 +6,7 @@
 import React from 'react';
 import { X, Printer, Download, CheckCircle, FileText } from 'lucide-react';
 import { useInterviews } from '../context/InterviewContext';
-import { getQuestionsForTier } from '../lib/questionsData';
+import { getQuestionsForTier } from '../lib/questionsService';
 
 interface DiagnosticExportModalProps {
   interviewId: string;

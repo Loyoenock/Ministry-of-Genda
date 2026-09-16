@@ -306,54 +306,54 @@ export const LoginView: React.FC = () => {
               </button>
             </form>
 
-            {/* Quick Demo Access Section */}
-            <div className="pt-5 border-t border-slate-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Quick Demo Access
-                </span>
-                <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-semibold">
-                  Instant Test Personas
-                </span>
-              </div>
+            {/* Quick Demo Access Section (Pure demo mode only) */}
+            {!isSupabaseConfigured && (
+              <div className="pt-5 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Quick Demo Access
+                  </span>
+                  <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-semibold">
+                    Instant Test Personas
+                  </span>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  id="login-demo-interviewer-btn"
-                  onClick={() => demoLogin('interviewer')}
-                  className="p-3 text-left border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
-                >
-                  <UserCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 leading-tight">John Okello</p>
-                    <p className="text-[11px] text-slate-500">Interviewer Role (RLS)</p>
-                  </div>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    id="login-demo-interviewer-btn"
+                    onClick={() => demoLogin('interviewer')}
+                    className="p-3 text-left border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
+                  >
+                    <UserCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 leading-tight">John Okello</p>
+                      <p className="text-[11px] text-slate-500">Interviewer Role (RLS)</p>
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  id="login-demo-admin-btn"
-                  onClick={() => demoLogin('admin')}
-                  className="p-3 text-left border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
-                >
-                  <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 leading-tight">Florence Nsubuga</p>
-                    <p className="text-[11px] text-slate-500">Directorate Admin</p>
-                  </div>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    id="login-demo-admin-btn"
+                    onClick={() => demoLogin('admin')}
+                    className="p-3 text-left border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 leading-tight">Florence Nsubuga</p>
+                      <p className="text-[11px] text-slate-500">Directorate Admin</p>
+                    </div>
+                  </button>
+                </div>
 
-              {!isSupabaseConfigured && (
                 <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] text-amber-800 flex items-start space-x-2">
                   <Database className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
                     <strong>Local Prototype Mode:</strong> Supabase environment variables (<code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code>) are not set. You can test all features with mock users above, or configure credentials in <code className="bg-amber-100 px-1 rounded">.env</code>.
                   </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Statutory Security Disclaimer */}

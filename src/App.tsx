@@ -18,6 +18,7 @@ import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
+import { DemoModeBanner } from './components/DemoModeBanner';
 import { Interview } from './types';
 
 function MainLayout() {
@@ -55,6 +56,9 @@ function MainLayout() {
         onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)}
         isMobileNavOpen={mobileNavOpen}
       />
+
+      {/* Demo Mode Warning Banner */}
+      <DemoModeBanner />
 
       {/* Main Workspace with Navy Sidebar & Body Content */}
       <div className="flex flex-1 overflow-hidden">

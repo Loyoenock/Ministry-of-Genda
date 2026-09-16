@@ -63,7 +63,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isTestEnv) {
       return INITIAL_CURRENT_USER;
     }
-    // Check saved demo user in localStorage
+    // In real Supabase mode, never allow localStorage demo users to override or seed authentication
+    if (isSupabaseConfigured) {
+      try {
+        localStorage.removeItem('mglsd_demo_user');
+        localStorage.removeItem('mglsd_active_user_id');
+      } catch {
+        // storage guard
+      }
+      return null;
+    }
+    // In pure demo mode, check saved demo user in localStorage
     const savedDemo = localStorage.getItem('mglsd_demo_user');
     if (savedDemo) {
       try {
@@ -85,13 +95,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
     if (isTestEnv) return true;
-    return Boolean(localStorage.getItem('mglsd_demo_user')) || !isSupabaseConfigured;
+    if (isSupabaseConfigured) return false;
+    return true;
   });
 
   const [loading, setLoading] = useState<boolean>(() => {
     if (isTestEnv) return false;
     return isSupabaseConfigured;
   });
+
+  // Log clear warning to console when running in demo mode
+  useEffect(() => {
+    if (isDemoMode && !isTestEnv) {
+      console.warn(
+        '⚠️ [MGLSD Diagnostic] Application is running in DEMO MODE.\n' +
+        'Authentication and persistence are simulated using local in-memory state and browser storage.\n' +
+        'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment to run against real Supabase.'
+      );
+    }
+  }, [isDemoMode, isTestEnv]);
 
   const [users, setUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('mglsd_app_users');
@@ -243,23 +265,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(currentSession);
         if (currentSession?.user) {
           setIsDemoMode(false);
+          try {
+            localStorage.removeItem('mglsd_demo_user');
+            localStorage.removeItem('mglsd_active_user_id');
+          } catch {
+            // guard
+          }
           fetchOrCreateProfile(currentSession.user);
         } else {
-          // If no active Supabase session, check if user had opted for demo mode
-          const savedDemo = localStorage.getItem('mglsd_demo_user');
-          if (savedDemo) {
-            try {
-              const parsed = JSON.parse(savedDemo);
-              setCurrentUser(parsed);
-              setActualRole(parsed.role);
-              setActiveRole(parsed.role);
-              setIsDemoMode(true);
-            } catch {
-              setCurrentUser(null);
-            }
-          } else {
-            setCurrentUser(null);
-          }
+          // When Supabase is configured, lack of active session means unauthenticated user.
+          // Never fall back to or activate a localStorage demo user!
+          setCurrentUser(null);
+          setIsDemoMode(false);
           setLoading(false);
         }
       })
@@ -280,12 +297,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (newSession?.user) {
           setIsDemoMode(false);
           localStorage.removeItem('mglsd_demo_user');
+          localStorage.removeItem('mglsd_active_user_id');
           await fetchOrCreateProfile(newSession.user);
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setIsDemoMode(false);
         localStorage.removeItem('mglsd_demo_user');
+        localStorage.removeItem('mglsd_active_user_id');
         setLoading(false);
       }
     });
@@ -300,8 +319,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Real Supabase Sign In (or local fallback in demo mode)
    */
   const login = async (email: string, password?: string): Promise<{ error: any }> => {
-    // If real Supabase is configured and a password was given, call Supabase Auth
-    if (isSupabaseConfigured && password) {
+    // If real Supabase is configured, require password and authenticate with Supabase Auth
+    if (isSupabaseConfigured) {
+      if (!password) {
+        return { error: new Error('Password is required for Supabase authentication.') };
+      }
       setLoading(true);
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -317,6 +339,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (data.user) {
           setIsDemoMode(false);
           localStorage.removeItem('mglsd_demo_user');
+          localStorage.removeItem('mglsd_active_user_id');
           await fetchOrCreateProfile(data.user);
         }
         return { error: null };
@@ -431,9 +454,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Quick 1-click Demo Login for development testing
+   * Quick 1-click Demo Login for development testing:
+   * Strictly disallowed when running against real Supabase or in production builds.
    */
   const demoLogin = (targetRole: UserRole = 'interviewer') => {
+    // In production or when Supabase is configured, block demo login
+    if (isSupabaseConfigured || (typeof import.meta !== 'undefined' && import.meta.env?.PROD)) {
+      console.warn('Security Warning: demoLogin is strictly disabled when Supabase is configured or in production mode.');
+      return;
+    }
     const selected = targetRole === 'admin' ? ADMIN_USER : INITIAL_CURRENT_USER;
     setCurrentUser(selected);
     setActualRole(selected.role);
@@ -445,33 +474,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Role Switcher for previewing RLS perspectives:
-   * - In Demo mode: freely switch between Interviewer and Admin personas
-   * - In Real Supabase mode: only authenticated Admins can toggle between 'admin' and 'interviewer' view
+   * - In Pure Demo mode (!isSupabaseConfigured or test env): freely switch between Interviewer and Admin personas
+   * - When Supabase is configured: non-admin users can NEVER call switchRole('admin') or escalate their role
+   * - Only authenticated Admins who signed in through Supabase can toggle between 'admin' and 'interviewer' preview
+   * - In production builds with Supabase: role switching is completely disabled
    */
   const switchRole = (newRole: UserRole) => {
-    if (isDemoMode) {
-      if (newRole === 'admin') {
-        const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
-        setCurrentUser(admin);
-        setActualRole('admin');
-        setActiveRole('admin');
-      } else {
-        const interviewer = users.find((u) => u.id === 'usr-john-okello-001') || INITIAL_CURRENT_USER;
-        setCurrentUser(interviewer);
-        setActualRole('interviewer');
-        setActiveRole('interviewer');
+    // 1. When Supabase is configured:
+    if (isSupabaseConfigured) {
+      // In production builds, completely disable role switching
+      if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
+        console.warn('Security Notice: Role switching is disabled in production with Supabase configured.');
+        return;
       }
-      return;
-    }
-
-    // In real Supabase Auth mode: only true admins can switch their active perspective
-    if (actualRole === 'admin') {
+      // Strictly prevent non-admins from switching to admin
+      if (actualRole !== 'admin') {
+        console.warn('Security Violation: Non-admin users cannot switch to admin role when Supabase is configured.');
+        return;
+      }
+      // Legitimate Supabase admins can preview the interviewer perspective
       setActiveRole(newRole);
       if (currentUser) {
         setCurrentUser({ ...currentUser, role: newRole });
       }
+      return;
+    }
+
+    // 2. Pure demo mode or test environment:
+    if (newRole === 'admin') {
+      const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
+      setCurrentUser(admin);
+      setActualRole('admin');
+      setActiveRole('admin');
     } else {
-      console.warn('Role escalation prevented: Non-admin users cannot switch to admin role.');
+      const interviewer = users.find((u) => u.id === 'usr-john-okello-001') || INITIAL_CURRENT_USER;
+      setCurrentUser(interviewer);
+      setActualRole('interviewer');
+      setActiveRole('interviewer');
     }
   };
 

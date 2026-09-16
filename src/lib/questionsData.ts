@@ -745,32 +745,9 @@ export const STATUTORY_DOCUMENTS_CATALOGUE = [
   },
 ];
 
-/**
- * Filter questions based on selected tier
- * Tier routing rules:
- * - Leadership → A, B, D, G, H
- * - Management → A (context), B, C, D, E, F, G, H
- * - Frontline Staff → C, E, F, H
- * - Support / IT / Records → E, G, H + W1–W4
- */
-export function getQuestionsForTier(tier: InterviewTier): Question[] {
-  return MASTER_QUESTIONS.filter((q) => q.applicable_tiers.includes(tier));
-}
+export {
+  getQuestionsForTier,
+  getSectionsForTier,
+  type SectionConfig,
+} from './questionsService';
 
-export function getSectionsForTier(tier: InterviewTier): { code: string; title: string; count: number }[] {
-  const questions = getQuestionsForTier(tier);
-  const sectionMap = new Map<string, { code: string; title: string; count: number }>();
-
-  for (const q of questions) {
-    if (!sectionMap.has(q.section_code)) {
-      sectionMap.set(q.section_code, {
-        code: q.section_code,
-        title: q.section_title,
-        count: 0,
-      });
-    }
-    sectionMap.get(q.section_code)!.count++;
-  }
-
-  return Array.from(sectionMap.values());
-}
