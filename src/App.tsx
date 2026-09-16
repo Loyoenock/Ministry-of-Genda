@@ -157,16 +157,13 @@ function RootContent() {
     return (
       <div className="min-h-screen bg-[#070d1f] text-slate-100 flex flex-col items-center justify-center p-4 selection:bg-teal-500 selection:text-white">
         <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
-          {/* Stylized Uganda Crest with gentle pulse */}
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500 via-red-600 to-black p-1 shadow-2xl flex items-center justify-center animate-pulse">
-            <div className="w-full h-full bg-[#0b132b] rounded-full flex items-center justify-center p-2">
-              <svg viewBox="0 0 100 100" className="w-10 h-10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M50 10 L80 30 L80 65 L50 90 L20 65 L20 30 Z" fill="#D97706" stroke="#FEF3C7" strokeWidth="3" />
-                <path d="M50 20 L70 35 L70 60 L50 78 L30 60 L30 35 Z" fill="#DC2626" />
-                <circle cx="50" cy="48" r="10" fill="#1E293B" stroke="#FDE047" strokeWidth="2" />
-                <path d="M47 43 L53 43 L50 53 Z" fill="#FDE047" />
-              </svg>
-            </div>
+          {/* Official Uganda Coat of Arms */}
+          <div className="w-20 h-20 flex items-center justify-center animate-pulse">
+            <img
+              src="/Coat_of_arms_of_Uganda.svg"
+              alt="Coat of Arms of Uganda"
+              className="w-full h-full object-contain drop-shadow-2xl select-none"
+            />
           </div>
           <div className="space-y-1">
             <h2 className="text-base font-bold text-white tracking-wide">

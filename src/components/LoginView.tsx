@@ -90,17 +90,12 @@ export const LoginView: React.FC = () => {
       {/* Top Ministry Ribbon */}
       <header className="relative z-10 border-b border-slate-800 bg-[#0b132b]/80 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          {/* Stylized Uganda Crest */}
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 via-red-600 to-black p-0.5 shadow flex items-center justify-center shrink-0">
-            <div className="w-full h-full bg-[#0b132b] rounded-full flex items-center justify-center p-1">
-              <svg viewBox="0 0 100 100" className="w-6 h-6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M50 10 L80 30 L80 65 L50 90 L20 65 L20 30 Z" fill="#D97706" stroke="#FEF3C7" strokeWidth="3" />
-                <path d="M50 20 L70 35 L70 60 L50 78 L30 60 L30 35 Z" fill="#DC2626" />
-                <circle cx="50" cy="48" r="10" fill="#1E293B" stroke="#FDE047" strokeWidth="2" />
-                <path d="M47 43 L53 43 L50 53 Z" fill="#FDE047" />
-              </svg>
-            </div>
-          </div>
+          {/* Official Coat of Arms of Uganda */}
+          <img
+            src="/Coat_of_arms_of_Uganda.svg"
+            alt="Coat of Arms of Uganda"
+            className="w-10 h-10 object-contain drop-shadow select-none shrink-0"
+          />
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
               The Republic of Uganda
@@ -130,8 +125,15 @@ export const LoginView: React.FC = () => {
       {/* Main Container */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
         <div className="w-full max-w-md space-y-6">
-          {/* Welcome Card & Title */}
-          <div className="text-center space-y-2">
+          {/* Welcome Card & Title with National Coat of Arms */}
+          <div className="text-center space-y-3">
+            <div className="flex justify-center">
+              <img
+                src="/Coat_of_arms_of_Uganda.svg"
+                alt="National Coat of Arms of Uganda"
+                className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-xl select-none"
+              />
+            </div>
             <div className="inline-flex items-center space-x-2 bg-teal-950/70 border border-teal-500/30 text-teal-300 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-teal-400" />
               <span>TRANSFORMATIVE Programme</span>

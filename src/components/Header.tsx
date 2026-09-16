@@ -62,18 +62,12 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-            {/* Stylized Uganda Coat of Arms Crest */}
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-amber-500 via-red-600 to-black p-0.5 shadow flex items-center justify-center shrink-0">
-              <div className="w-full h-full bg-[#0b132b] rounded-full flex items-center justify-center p-1">
-                <svg viewBox="0 0 100 100" className="w-6 h-6 sm:w-7 sm:h-7" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M50 10 L80 30 L80 65 L50 90 L20 65 L20 30 Z" fill="#D97706" stroke="#FEF3C7" strokeWidth="3" />
-                  <path d="M50 20 L70 35 L70 60 L50 78 L30 60 L30 35 Z" fill="#DC2626" />
-                  <circle cx="50" cy="48" r="10" fill="#1E293B" stroke="#FDE047" strokeWidth="2" />
-                  <path d="M47 43 L53 43 L50 53 Z" fill="#FDE047" />
-                  <rect x="25" y="85" width="50" height="5" rx="2" fill="#FDE047" />
-                </svg>
-              </div>
-            </div>
+            {/* Official Coat of Arms of Uganda Logo */}
+            <img
+              src="/Coat_of_arms_of_Uganda.svg"
+              alt="Coat of Arms of Uganda"
+              className="w-10 h-10 sm:w-11 sm:h-11 object-contain shrink-0 drop-shadow select-none"
+            />
 
             <div className="min-w-0">
               <h1 className="font-bold text-xs sm:text-sm tracking-tight text-white leading-tight truncate">

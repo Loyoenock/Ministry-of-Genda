@@ -63,19 +63,28 @@ export const DiagnosticExportModal: React.FC<DiagnosticExportModalProps> = ({
         {/* Printable Paper Document */}
         <div className="p-4 sm:p-8 overflow-y-auto space-y-6 text-slate-800 bg-white font-serif print:p-0 flex-1">
           {/* Official Letterhead */}
-          <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-600">
-              The Republic of Uganda
-            </p>
-            <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-950">
-              Ministry of Gender, Labour and Social Development
-            </h1>
-            <p className="text-[11px] sm:text-xs font-semibold text-teal-900">
-              TRANSFORMATIVE Programme • Current-State Diagnostic Interview Report
-            </p>
-            <p className="text-[10px] sm:text-[11px] text-slate-500">
-              Official Record of Field Evidence & Institutional Current-State Assessment
-            </p>
+          <div className="text-center border-b-2 border-slate-900 pb-4 space-y-2">
+            <div className="flex justify-center">
+              <img
+                src="/Coat_of_arms_of_Uganda.svg"
+                alt="Coat of Arms of Uganda"
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain print:w-16 print:h-16"
+              />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-600">
+                The Republic of Uganda
+              </p>
+              <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-950">
+                Ministry of Gender, Labour and Social Development
+              </h1>
+              <p className="text-[11px] sm:text-xs font-semibold text-teal-900">
+                TRANSFORMATIVE Programme • Current-State Diagnostic Interview Report
+              </p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500">
+                Official Record of Field Evidence & Institutional Current-State Assessment
+              </p>
+            </div>
           </div>
 
           {/* Metadata Grid */}

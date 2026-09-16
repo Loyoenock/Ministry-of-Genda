@@ -100,14 +100,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isDrawer && (
           <div className="flex items-center justify-between pb-4 mb-3 border-b border-slate-800">
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 via-red-600 to-black p-0.5 shadow flex items-center justify-center shrink-0">
-                <div className="w-full h-full bg-[#0b132b] rounded-full flex items-center justify-center p-0.5">
-                  <svg viewBox="0 0 100 100" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M50 10 L80 30 L80 65 L50 90 L20 65 L20 30 Z" fill="#D97706" stroke="#FEF3C7" strokeWidth="3" />
-                    <path d="M50 20 L70 35 L70 60 L50 78 L30 60 L30 35 Z" fill="#DC2626" />
-                  </svg>
-                </div>
-              </div>
+              <img
+                src="/Coat_of_arms_of_Uganda.svg"
+                alt="Coat of Arms of Uganda"
+                className="w-8 h-8 object-contain shrink-0 drop-shadow"
+              />
               <div>
                 <p className="font-bold text-xs text-white">MGLSD Navigation</p>
                 <p className="text-[10px] text-amber-400 font-semibold tracking-wider">UGANDA</p>
@@ -216,9 +213,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Bottom Transformed Uganda Branding */}
       <div className="p-4 border-t border-slate-800/60 bg-[#060c1b] shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center p-1.5 shadow-sm shrink-0">
-            <Layers className="w-5 h-5 text-slate-950 font-bold" />
-          </div>
+          <img
+            src="/Coat_of_arms_of_Uganda.svg"
+            alt="National Coat of Arms"
+            className="w-8 h-8 object-contain shrink-0 drop-shadow select-none"
+          />
           <div>
             <p className="text-xs font-bold text-slate-200 leading-tight">
               Better Systems

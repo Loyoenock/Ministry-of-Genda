@@ -160,16 +160,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
       {/* Top Header: Greeting & Date card */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs sm:text-sm font-medium text-slate-500">
-            Good morning, {user.full_name.split(' ')[0]}
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Your Interview Dashboard
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Track your interviews, manage your schedule and capture accurate diagnostic data.
-          </p>
+        <div className="flex items-start sm:items-center space-x-3.5">
+          <img
+            src="/Coat_of_arms_of_Uganda.svg"
+            alt="National Coat of Arms"
+            className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0 drop-shadow-sm select-none"
+          />
+          <div>
+            <p className="text-xs sm:text-sm font-medium text-slate-500">
+              Good morning, {user.full_name.split(' ')[0]}
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Your Interview Dashboard
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Track your interviews, manage your schedule and capture accurate diagnostic data.
+            </p>
+          </div>
         </div>
 
         {/* Date / Last Updated Card */}
@@ -786,6 +793,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="p-4 space-y-2.5">
+              <div className="flex items-center space-x-3 pb-2.5 border-b border-slate-800">
+                <img
+                  src="/Coat_of_arms_of_Uganda.svg"
+                  alt="Republic of Uganda Coat of Arms"
+                  className="w-9 h-9 object-contain shrink-0 drop-shadow"
+                />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
+                    The Republic of Uganda
+                  </p>
+                  <p className="text-xs font-bold text-white truncate">
+                    Ministry of Gender, Labour and Social Dev.
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <a
                   href="https://mglsd.go.ug"
