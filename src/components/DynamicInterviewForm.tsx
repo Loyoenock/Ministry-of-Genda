@@ -25,6 +25,7 @@ import {
   BarChart,
   Sliders,
   Check,
+  ExternalLink,
 } from 'lucide-react';
 import { Interview, Question, Answer, DocumentItem, InterviewerNote, ExistsStatus, CollectedStatus } from '../types';
 import { getQuestionsForTier, getSectionsForTier } from '../lib/questionsData';
@@ -709,9 +710,22 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                   {item.file_name ? (
                     <div className="flex items-center space-x-2 text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-xs font-semibold">
                       <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="truncate flex-1" title={item.file_name}>
-                        {item.file_name}
-                      </span>
+                      {item.file_url && item.file_url.startsWith('http') ? (
+                        <a
+                          href={item.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate flex-1 hover:underline inline-flex items-center gap-1.5"
+                          title="Click to view/download in Supabase Storage"
+                        >
+                          <span className="truncate">{item.file_name}</span>
+                          <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                        </a>
+                      ) : (
+                        <span className="truncate flex-1" title={item.file_name}>
+                          {item.file_name}
+                        </span>
+                      )}
                     </div>
                   ) : (
                     <label className="cursor-pointer flex items-center justify-center space-x-2 w-full py-2.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition min-h-[42px] shadow-2xs">
@@ -723,7 +737,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            uploadDocumentFile(interview.id, item.item_number, file.name);
+                            uploadDocumentFile(interview.id, item.item_number, file);
                           }
                         }}
                       />
@@ -834,11 +848,24 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                     {/* File Upload / Attachment */}
                     <td className="py-3.5 px-3 text-right">
                       {item.file_name ? (
-                        <div className="flex items-center justify-end space-x-1 text-emerald-700 font-medium text-xs">
-                          <Check className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-[100px]" title={item.file_name}>
-                            {item.file_name}
-                          </span>
+                        <div className="flex items-center justify-end space-x-1.5 text-emerald-700 font-medium text-xs">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          {item.file_url && item.file_url.startsWith('http') ? (
+                            <a
+                              href={item.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate max-w-[120px] hover:underline inline-flex items-center gap-1"
+                              title="Click to open attachment"
+                            >
+                              <span className="truncate">{item.file_name}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-70 shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="truncate max-w-[120px]" title={item.file_name}>
+                              {item.file_name}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <label className="cursor-pointer inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition">
@@ -850,7 +877,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                uploadDocumentFile(interview.id, item.item_number, file.name);
+                                uploadDocumentFile(interview.id, item.item_number, file);
                               }
                             }}
                           />

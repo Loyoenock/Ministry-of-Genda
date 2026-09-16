@@ -3,14 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Interview,
   Answer,
   DocumentItem,
   InterviewerNote,
   RecentActivityItem,
-  InterviewTier,
   InterviewStatus,
 } from '../types';
 import {
@@ -22,8 +21,25 @@ import {
 } from '../lib/mockData';
 import { getQuestionsForTier } from '../lib/questionsData';
 import { useAuth } from './AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
+import {
+  isUuid,
+  generateUuid,
+  fetchInterviewsFromSupabase,
+  fetchAllInterviewsGlobalFromSupabase,
+  insertInterviewToSupabase,
+  updateInterviewInSupabase,
+  deleteInterviewFromSupabase,
+  fetchAnswersFromSupabase,
+  upsertAnswerInSupabase,
+  fetchOrInitChecklistFromSupabase,
+  updateChecklistItemInSupabase,
+  fetchOrInitNotesFromSupabase,
+  saveNotesToSupabase,
+  uploadFileToSupabaseStorage,
+} from '../lib/interviewService';
 
-interface InterviewContextType {
+export interface InterviewContextType {
   interviews: Interview[];
   allInterviewsGlobal: Interview[];
   activeInterviewId: string | null;
@@ -33,17 +49,35 @@ interface InterviewContextType {
   checklists: Record<string, DocumentItem[]>;
   notes: Record<string, InterviewerNote>;
   autoSaveStatus: 'saved' | 'saving' | 'error';
+  loading: boolean;
+  error: string | null;
+  refreshInterviews: () => Promise<void>;
   selectInterview: (id: string | null) => void;
-  createInterview: (interviewData: Omit<Interview, 'id' | 'created_at' | 'updated_at' | 'completion_percentage'>) => Interview;
-  updateInterview: (id: string, updates: Partial<Interview>) => void;
-  deleteInterview: (id: string) => void;
+  createInterview: (
+    interviewData: Omit<Interview, 'id' | 'created_at' | 'updated_at' | 'completion_percentage'>
+  ) => Interview;
+  updateInterview: (id: string, updates: Partial<Interview>) => void | Promise<void>;
+  deleteInterview: (id: string) => void | Promise<void>;
   getInterviewAnswers: (interviewId: string) => Answer[];
-  saveAnswer: (interviewId: string, questionId: string, text: string, structuredData?: Record<string, any>) => void;
+  saveAnswer: (
+    interviewId: string,
+    questionId: string,
+    text: string,
+    structuredData?: Record<string, any>
+  ) => void | Promise<void>;
   getInterviewChecklist: (interviewId: string) => DocumentItem[];
-  updateChecklistItem: (interviewId: string, itemNumber: number, updates: Partial<DocumentItem>) => void;
+  updateChecklistItem: (
+    interviewId: string,
+    itemNumber: number,
+    updates: Partial<DocumentItem>
+  ) => void | Promise<void>;
   getInterviewNotes: (interviewId: string) => InterviewerNote;
-  saveNotes: (interviewId: string, updates: Partial<InterviewerNote>) => void;
-  uploadDocumentFile: (interviewId: string, itemNumber: number, fileName: string) => void;
+  saveNotes: (interviewId: string, updates: Partial<InterviewerNote>) => void | Promise<void>;
+  uploadDocumentFile: (
+    interviewId: string,
+    itemNumber: number,
+    fileOrName: File | string
+  ) => Promise<string | void> | void;
 }
 
 const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
@@ -51,6 +85,7 @@ const InterviewContext = createContext<InterviewContextType | undefined>(undefin
 export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAdmin } = useAuth();
 
+  // Local caching & offline resilience state
   const [allInterviews, setAllInterviews] = useState<Interview[]>(() => {
     const saved = localStorage.getItem('mglsd_interviews');
     if (saved) {
@@ -124,34 +159,130 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sync to localStorage
+  // Sync to localStorage as offline cache
   useEffect(() => {
-    localStorage.setItem('mglsd_interviews', JSON.stringify(allInterviews));
+    try {
+      localStorage.setItem('mglsd_interviews', JSON.stringify(allInterviews));
+    } catch {
+      // quota or private mode guard
+    }
   }, [allInterviews]);
 
   useEffect(() => {
-    localStorage.setItem('mglsd_answers', JSON.stringify(answersMap));
+    try {
+      localStorage.setItem('mglsd_answers', JSON.stringify(answersMap));
+    } catch {
+      // quota guard
+    }
   }, [answersMap]);
 
   useEffect(() => {
-    localStorage.setItem('mglsd_checklists', JSON.stringify(checklistsMap));
+    try {
+      localStorage.setItem('mglsd_checklists', JSON.stringify(checklistsMap));
+    } catch {
+      // quota guard
+    }
   }, [checklistsMap]);
 
   useEffect(() => {
-    localStorage.setItem('mglsd_notes', JSON.stringify(notesMap));
+    try {
+      localStorage.setItem('mglsd_notes', JSON.stringify(notesMap));
+    } catch {
+      // quota guard
+    }
   }, [notesMap]);
 
   useEffect(() => {
-    localStorage.setItem('mglsd_activities', JSON.stringify(recentActivities));
+    try {
+      localStorage.setItem('mglsd_activities', JSON.stringify(recentActivities));
+    } catch {
+      // quota guard
+    }
   }, [recentActivities]);
 
-  // RLS Enforcement:
-  // If Interviewer: only sees interviews where interviewer_id matches user.id
-  // If Admin: sees everything
+  /**
+   * Primary data loader: Fetches user's interviews (or all if admin) from Supabase
+   */
+  const loadInterviews = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (isAdmin) {
+        const globalList = await fetchAllInterviewsGlobalFromSupabase();
+        if (globalList.length > 0) {
+          setAllInterviews(globalList);
+        }
+      } else if (user?.id) {
+        const userList = await fetchInterviewsFromSupabase(user.id, false);
+        if (userList.length > 0) {
+          setAllInterviews(userList);
+        }
+      }
+    } catch (err: any) {
+      console.warn('Notice: Supabase interviews sync error:', err);
+      setError(err?.message || 'Could not connect to database');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, isAdmin]);
+
+  // Load interviews when auth state changes
+  useEffect(() => {
+    loadInterviews();
+  }, [loadInterviews]);
+
+  // Load answers, checklist, and notes from Supabase when an interview is selected
+  const loadInterviewSubData = useCallback(async (id: string) => {
+    if (!isSupabaseConfigured || !isUuid(id)) {
+      return;
+    }
+
+    try {
+      // 1. Fetch answers
+      const fetchedAnswers = await fetchAnswersFromSupabase(id);
+      if (fetchedAnswers.length > 0) {
+        setAnswersMap((prev) => ({
+          ...prev,
+          [id]: fetchedAnswers,
+        }));
+      }
+
+      // 2. Fetch checklist
+      const fetchedChecklist = await fetchOrInitChecklistFromSupabase(id);
+      if (fetchedChecklist.length > 0) {
+        setChecklistsMap((prev) => ({
+          ...prev,
+          [id]: fetchedChecklist,
+        }));
+      }
+
+      // 3. Fetch notes
+      const fetchedNotes = await fetchOrInitNotesFromSupabase(id);
+      if (fetchedNotes) {
+        setNotesMap((prev) => ({
+          ...prev,
+          [id]: fetchedNotes,
+        }));
+      }
+    } catch (err) {
+      console.warn('Notice: Error loading interview details from Supabase:', err);
+    }
+  }, []);
+
+  // Row Level Security (RLS) Visibility:
+  // - Admin sees everything
+  // - Interviewer only sees interviews assigned to them
   const visibleInterviews = isAdmin
     ? allInterviews
-    : allInterviews.filter((it) => user?.id ? it.interviewer_id === user.id : true);
+    : allInterviews.filter((it) => (user?.id ? it.interviewer_id === user.id : true));
 
   const activeInterview =
     allInterviews.find((it) => it.id === activeInterviewId) || null;
@@ -159,7 +290,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const selectInterview = (id: string | null) => {
     setActiveInterviewId(id);
     if (id) {
-      // Ensure checklist and notes exist
+      // Ensure checklist and notes exist locally
       if (!checklistsMap[id]) {
         setChecklistsMap((prev) => ({
           ...prev,
@@ -172,29 +303,44 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           [id]: createInitialNotes(id),
         }));
       }
+
+      // Fetch fresh Supabase records if online
+      loadInterviewSubData(id);
     }
   };
 
+  /**
+   * Create Interview:
+   * Synchronously creates optimistic local record for instant UI navigation,
+   * then asynchronously persists to Supabase 'interviews', 'documents_checklist',
+   * and 'interviewer_notes' tables.
+   */
   const createInterview = (
     data: Omit<Interview, 'id' | 'created_at' | 'updated_at' | 'completion_percentage'>
   ): Interview => {
-    const newId = `int-${Date.now().toString().slice(-4)}`;
+    const newId = generateUuid();
+    const nowIso = new Date().toISOString();
+
     const newInterview: Interview = {
       ...data,
       id: newId,
       completion_percentage: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: nowIso,
+      updated_at: nowIso,
     };
 
+    // 1. Optimistic local updates
     setAllInterviews((prev) => [newInterview, ...prev]);
+    const initialChecklist = createInitialChecklist(newId);
+    const initialNotes = createInitialNotes(newId);
+
     setChecklistsMap((prev) => ({
       ...prev,
-      [newId]: createInitialChecklist(newId),
+      [newId]: initialChecklist,
     }));
     setNotesMap((prev) => ({
       ...prev,
-      [newId]: createInitialNotes(newId),
+      [newId]: initialNotes,
     }));
     setAnswersMap((prev) => ({
       ...prev,
@@ -205,7 +351,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setRecentActivities((prev) => [
       {
         id: `act-${Date.now()}`,
-        description: `You started an interview with ${data.interviewee_name} (${data.role_title})`,
+        description: `You scheduled an interview with ${data.interviewee_name} (${data.role_title})`,
         timestamp: 'Just now',
         type: 'started',
         interviewee: data.interviewee_name,
@@ -214,19 +360,57 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ...prev.slice(0, 8),
     ]);
 
+    // 2. Asynchronously persist to Supabase if configured
+    if (isSupabaseConfigured && isUuid(newInterview.interviewer_id)) {
+      insertInterviewToSupabase(newInterview)
+        .then(() => {
+          // Initialize statutory checklist in Supabase
+          return fetchOrInitChecklistFromSupabase(newId);
+        })
+        .then(() => {
+          // Initialize notes in Supabase
+          return fetchOrInitNotesFromSupabase(newId);
+        })
+        .catch((err) => {
+          console.warn('Notice: Background Supabase interview creation sync:', err);
+        });
+    }
+
     return newInterview;
   };
 
+  /**
+   * Update Interview:
+   * Optimistically updates state, then persists to Supabase.
+   */
   const updateInterview = (id: string, updates: Partial<Interview>) => {
     setAllInterviews((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...updates, updated_at: new Date().toISOString() } : it))
+      prev.map((it) =>
+        it.id === id ? { ...it, ...updates, updated_at: new Date().toISOString() } : it
+      )
     );
+
+    if (isSupabaseConfigured && isUuid(id)) {
+      updateInterviewInSupabase(id, updates).catch((err) => {
+        console.warn('Notice: Supabase interview update sync:', err);
+      });
+    }
   };
 
+  /**
+   * Delete Interview:
+   * Optimistically removes interview, then calls Supabase delete.
+   */
   const deleteInterview = (id: string) => {
     setAllInterviews((prev) => prev.filter((it) => it.id !== id));
     if (activeInterviewId === id) {
       setActiveInterviewId(null);
+    }
+
+    if (isSupabaseConfigured && isUuid(id)) {
+      deleteInterviewFromSupabase(id).catch((err) => {
+        console.warn('Notice: Supabase interview deletion sync:', err);
+      });
     }
   };
 
@@ -234,6 +418,14 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return answersMap[interviewId] || [];
   };
 
+  // Debounce timers map for saving answers
+  const saveAnswerTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
+  /**
+   * Save Answer:
+   * Optimistic instant in-memory update with debounced auto-save to Supabase.
+   * Recalculates completion percentage and updates status dynamically.
+   */
   const saveAnswer = (
     interviewId: string,
     questionId: string,
@@ -241,6 +433,10 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     structuredData?: Record<string, any>
   ) => {
     setAutoSaveStatus('saving');
+
+    let updatedPct = 0;
+    let nextStatus: InterviewStatus = 'In Progress';
+
     setAnswersMap((prev) => {
       const currentList = prev[interviewId] || [];
       const existingIdx = currentList.findIndex((a) => a.question_id === questionId);
@@ -271,17 +467,18 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (targetInterview) {
         const applicableQuestions = getQuestionsForTier(targetInterview.tier);
         const answeredCount = updatedList.filter((a) => a.answer_text.trim().length > 0).length;
-        const pct = Math.min(100, Math.round((answeredCount / (applicableQuestions.length || 1)) * 100));
-        
-        let nextStatus: InterviewStatus = targetInterview.status;
-        if (pct === 100) {
+        updatedPct = Math.min(100, Math.round((answeredCount / (applicableQuestions.length || 1)) * 100));
+
+        nextStatus = targetInterview.status;
+        if (updatedPct === 100) {
           nextStatus = 'Completed';
-        } else if (pct > 0 && targetInterview.status === 'Draft') {
+        } else if (updatedPct > 0 && targetInterview.status === 'Draft') {
           nextStatus = 'In Progress';
         }
 
+        // Update local interview progress
         updateInterview(interviewId, {
-          completion_percentage: pct,
+          completion_percentage: updatedPct,
           status: nextStatus,
         });
       }
@@ -292,21 +489,51 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
     });
 
-    setTimeout(() => {
-      setAutoSaveStatus('saved');
-    }, 400);
+    // Debounce Supabase persistence
+    const key = `${interviewId}-${questionId}`;
+    if (saveAnswerTimers.current[key]) {
+      clearTimeout(saveAnswerTimers.current[key]);
+    }
+
+    saveAnswerTimers.current[key] = setTimeout(async () => {
+      if (isSupabaseConfigured && isUuid(interviewId)) {
+        try {
+          await upsertAnswerInSupabase(
+            interviewId,
+            questionId,
+            text,
+            structuredData,
+            user?.id
+          );
+          await updateInterviewInSupabase(interviewId, {
+            completion_percentage: updatedPct,
+            status: nextStatus,
+          });
+          setAutoSaveStatus('saved');
+        } catch {
+          setAutoSaveStatus('error');
+        }
+      } else {
+        setAutoSaveStatus('saved');
+      }
+    }, 450);
   };
 
   const getInterviewChecklist = (interviewId: string): DocumentItem[] => {
     return checklistsMap[interviewId] || createInitialChecklist(interviewId);
   };
 
+  /**
+   * Update Checklist Item:
+   * Optimistic update + Supabase sync.
+   */
   const updateChecklistItem = (
     interviewId: string,
     itemNumber: number,
     updates: Partial<DocumentItem>
   ) => {
     setAutoSaveStatus('saving');
+
     setChecklistsMap((prev) => {
       const current = prev[interviewId] || createInitialChecklist(interviewId);
       const updated = current.map((item) =>
@@ -317,30 +544,76 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         [interviewId]: updated,
       };
     });
-    setTimeout(() => setAutoSaveStatus('saved'), 300);
+
+    if (isSupabaseConfigured && isUuid(interviewId)) {
+      updateChecklistItemInSupabase(interviewId, itemNumber, updates)
+        .then(() => setAutoSaveStatus('saved'))
+        .catch(() => setAutoSaveStatus('error'));
+    } else {
+      setTimeout(() => setAutoSaveStatus('saved'), 300);
+    }
   };
 
   const getInterviewNotes = (interviewId: string): InterviewerNote => {
     return notesMap[interviewId] || createInitialNotes(interviewId);
   };
 
+  const saveNotesTimer = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Save Notes:
+   * Optimistic update + debounced Supabase sync.
+   */
   const saveNotes = (interviewId: string, updates: Partial<InterviewerNote>) => {
     setAutoSaveStatus('saving');
+
+    let updatedNote: InterviewerNote;
     setNotesMap((prev) => {
       const current = prev[interviewId] || createInitialNotes(interviewId);
+      updatedNote = {
+        ...current,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
       return {
         ...prev,
-        [interviewId]: {
-          ...current,
-          ...updates,
-          updated_at: new Date().toISOString(),
-        },
+        [interviewId]: updatedNote,
       };
     });
-    setTimeout(() => setAutoSaveStatus('saved'), 300);
+
+    if (saveNotesTimer.current) {
+      clearTimeout(saveNotesTimer.current);
+    }
+
+    saveNotesTimer.current = setTimeout(async () => {
+      if (isSupabaseConfigured && isUuid(interviewId)) {
+        try {
+          await saveNotesToSupabase(interviewId, updates);
+          setAutoSaveStatus('saved');
+        } catch {
+          setAutoSaveStatus('error');
+        }
+      } else {
+        setAutoSaveStatus('saved');
+      }
+    }, 450);
   };
 
-  const uploadDocumentFile = (interviewId: string, itemNumber: number, fileName: string) => {
+  /**
+   * Real file upload to Supabase Storage:
+   * Handles File objects via uploadFileToSupabaseStorage and saves path/URL to documents_checklist.
+   * Also accepts string filenames for backwards compatibility.
+   */
+  const uploadDocumentFile = async (
+    interviewId: string,
+    itemNumber: number,
+    fileOrName: File | string
+  ): Promise<string | void> => {
+    setAutoSaveStatus('saving');
+
+    const fileName = typeof fileOrName === 'string' ? fileOrName : fileOrName.name;
+
+    // 1. Optimistic checklist item update
     updateChecklistItem(interviewId, itemNumber, {
       collected_status: 'Collected',
       exists_status: 'Yes',
@@ -348,6 +621,31 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       file_url: `#${fileName}`,
     });
 
+    // 2. Real upload to Supabase Storage if File instance
+    let finalUrl = `#${fileName}`;
+    if (fileOrName instanceof File && isSupabaseConfigured) {
+      try {
+        const uploadResult = await uploadFileToSupabaseStorage(
+          interviewId,
+          itemNumber,
+          fileOrName,
+          user?.id
+        );
+        finalUrl = uploadResult.url;
+
+        // Update with permanent signed URL / storage path
+        updateChecklistItem(interviewId, itemNumber, {
+          file_url: uploadResult.url,
+          file_name: uploadResult.fileName,
+        });
+      } catch (uploadErr) {
+        console.warn('Storage upload notice:', uploadErr);
+      }
+    }
+
+    setAutoSaveStatus('saved');
+
+    // 3. Record recent activity item
     setRecentActivities((prev) => [
       {
         id: `act-${Date.now()}`,
@@ -358,6 +656,8 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       },
       ...prev.slice(0, 8),
     ]);
+
+    return finalUrl;
   };
 
   return (
@@ -372,6 +672,9 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         checklists: checklistsMap,
         notes: notesMap,
         autoSaveStatus,
+        loading,
+        error,
+        refreshInterviews: loadInterviews,
         selectInterview,
         createInterview,
         updateInterview,

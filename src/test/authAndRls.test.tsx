@@ -16,7 +16,7 @@ function TestAuthConsumer() {
 
   return (
     <div>
-      <div data-testid="user-name">{user.full_name}</div>
+      <div data-testid="user-name">{user?.full_name || 'No user'}</div>
       <div data-testid="user-role">{role}</div>
       <div data-testid="visible-count">{interviews.length}</div>
       <div data-testid="global-count">{allInterviewsGlobal.length}</div>
