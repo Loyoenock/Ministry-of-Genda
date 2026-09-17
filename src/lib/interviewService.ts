@@ -71,7 +71,9 @@ export function mapRowToDocumentItem(row: any): DocumentItem {
   if (row.file_url) {
     const cleanUrl = row.file_url.split('?')[0];
     const rawName = cleanUrl.split('/').pop() || '';
-    fileName = rawName.replace(/^(\d+_|#)/, '') || row.file_url;
+    // Strip leading item number and timestamp or demo prefix
+    // e.g. "1_1726578912345_OSH_Act.pdf" -> "OSH_Act.pdf"
+    fileName = rawName.replace(/^(\d+_\d+_|\d+_|#demo-|#)/, '') || row.file_url;
   }
 
   return {
@@ -86,6 +88,7 @@ export function mapRowToDocumentItem(row: any): DocumentItem {
     follow_up_action: row.follow_up_action || '',
     file_url: row.file_url || undefined,
     file_name: fileName,
+    storage_path: row.file_url || undefined,
   };
 }
 
@@ -291,6 +294,55 @@ export async function deleteInterviewFromSupabase(id: string): Promise<boolean> 
   } catch (err) {
     console.warn('Error deleting interview from Supabase:', err);
     return false;
+  }
+}
+
+/**
+ * Remove local storage entries for an interview in demo mode or offline cache
+ */
+export function removeDemoStorageEntriesForInterview(interviewId: string): void {
+  try {
+    // 1. Remove from mglsd_interviews
+    const savedInterviews = localStorage.getItem('mglsd_interviews');
+    if (savedInterviews) {
+      const parsed = JSON.parse(savedInterviews);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((it: any) => it.id !== interviewId);
+        localStorage.setItem('mglsd_interviews', JSON.stringify(filtered));
+      }
+    }
+
+    // 2. Remove from mglsd_answers
+    const savedAnswers = localStorage.getItem('mglsd_answers');
+    if (savedAnswers) {
+      const parsed = JSON.parse(savedAnswers);
+      if (parsed && typeof parsed === 'object') {
+        delete parsed[interviewId];
+        localStorage.setItem('mglsd_answers', JSON.stringify(parsed));
+      }
+    }
+
+    // 3. Remove from mglsd_checklists
+    const savedChecklists = localStorage.getItem('mglsd_checklists');
+    if (savedChecklists) {
+      const parsed = JSON.parse(savedChecklists);
+      if (parsed && typeof parsed === 'object') {
+        delete parsed[interviewId];
+        localStorage.setItem('mglsd_checklists', JSON.stringify(parsed));
+      }
+    }
+
+    // 4. Remove from mglsd_notes
+    const savedNotes = localStorage.getItem('mglsd_notes');
+    if (savedNotes) {
+      const parsed = JSON.parse(savedNotes);
+      if (parsed && typeof parsed === 'object') {
+        delete parsed[interviewId];
+        localStorage.setItem('mglsd_notes', JSON.stringify(parsed));
+      }
+    }
+  } catch (err) {
+    console.warn('Notice: Error clearing demo localStorage entries:', err);
   }
 }
 
@@ -539,10 +591,91 @@ export async function saveNotesToSupabase(
   }
 }
 
+export const ALLOWED_DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv',
+];
+
+export const MAX_DOCUMENT_SIZE_BYTES = 52428800; // 50MB storage quota per file
+
+/**
+ * Validates file size and format before attempting upload
+ */
+export function validateDocumentFile(file: File): { valid: boolean; error?: string } {
+  if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+    return {
+      valid: false,
+      error: 'Upload failed: File exceeds the 50MB maximum size limit allowed by the Directorate repository.',
+    };
+  }
+
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+  const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'];
+  const isMimeAllowed = file.type ? ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type) : false;
+  const isExtAllowed = allowedExtensions.includes(fileExt);
+
+  if (!isMimeAllowed && !isExtAllowed) {
+    return {
+      valid: false,
+      error: 'Upload failed: Unsupported file format. Please upload a PDF, Word document (DOC/DOCX), Excel spreadsheet (XLS/XLSX), or image (PNG/JPEG/WEBP).',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Maps Supabase Storage and Postgres error codes to clear, accessible user messages
+ */
+export function parseStorageError(error: any): string {
+  if (!error) return 'An unknown storage error occurred.';
+  const message = error.message || (typeof error === 'string' ? error : JSON.stringify(error));
+  const status = error.statusCode || error.status || (error as any).code;
+
+  if (
+    status === 403 ||
+    status === '403' ||
+    /permission denied|row-level security|violates row-level|unauthorized|access denied/i.test(message)
+  ) {
+    return 'Upload failed: Access denied by security policy. You do not have permission to attach documents to this interview.';
+  }
+
+  if (
+    status === 413 ||
+    status === '413' ||
+    /payload too large|file size|exceeded|quota/i.test(message)
+  ) {
+    return 'Upload failed: File exceeds the 50MB maximum size limit allowed by the Directorate repository.';
+  }
+
+  if (
+    status === 415 ||
+    /mime type|invalid format|unsupported|not allowed/i.test(message)
+  ) {
+    return 'Upload failed: Unsupported file format. Please upload a PDF, Word document (DOC/DOCX), Excel spreadsheet (XLS/XLSX), or image (PNG/JPEG/WEBP).';
+  }
+
+  if (/network|failed to fetch|offline|timeout|abort|connection/i.test(message)) {
+    return 'Upload failed: Network connection error. Unable to reach Supabase storage. Please check your connection and retry.';
+  }
+
+  return `Upload failed: ${message}`;
+}
+
 /**
  * Real file upload to Supabase Storage:
- * Uploads file to private bucket 'interview-documents' with path '{interview_id}/{item_number}_{filename}'
- * Logs metadata to 'interview_files' table and returns signed URL or public/storage reference.
+ * a. Uploads the binary to storage path: {interview_id}/{item_number}_{timestamp}_{filename}
+ * b. Inserts a row into public.interview_files
+ * c. Updates documents_checklist.file_url
+ * d. Returns a usable signed URL (1-hour expiry) and storage path
  */
 export async function uploadFileToSupabaseStorage(
   interviewId: string,
@@ -550,68 +683,158 @@ export async function uploadFileToSupabaseStorage(
   file: File,
   uploadedByUserId?: string
 ): Promise<{ storagePath: string; url: string; fileName: string }> {
+  // Pre-upload validation
+  const validation = validateDocumentFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const timestamp = Date.now();
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const storagePath = `${interviewId}/${itemNumber}_${sanitizedName}`;
+  const storagePath = `${interviewId}/${itemNumber}_${timestamp}_${sanitizedName}`;
 
   if (!isSupabaseConfigured) {
     return {
       storagePath,
-      url: `#${file.name}`,
+      url: `#demo-${file.name}`,
       fileName: file.name,
     };
   }
 
+  // 1. Upload to Supabase Storage bucket 'interview-documents'
+  const { data: uploadData, error: uploadErr } = await supabase.storage
+    .from('interview-documents')
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type || 'application/octet-stream',
+    });
+
+  if (uploadErr) {
+    const userMsg = parseStorageError(uploadErr);
+    console.error('Supabase storage upload error:', uploadErr);
+    throw new Error(userMsg);
+  }
+
+  // 2. Generate a usable signed URL (1-hour expiry = 3600 seconds)
+  let accessUrl = storagePath;
+  const { data: signedUrlData, error: signErr } = await supabase.storage
+    .from('interview-documents')
+    .createSignedUrl(storagePath, 3600);
+
+  if (!signErr && signedUrlData?.signedUrl) {
+    accessUrl = signedUrlData.signedUrl;
+  } else if (uploadData?.path) {
+    accessUrl = uploadData.path;
+  }
+
+  // 3. Resolve user id for uploaded_by
+  let effectiveUserId = uploadedByUserId;
+  if (!effectiveUserId || !isUuid(effectiveUserId)) {
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user?.id) {
+      effectiveUserId = authData.user.id;
+    }
+  }
+
+  // 4. Insert row into public.interview_files
+  if (effectiveUserId && isUuid(effectiveUserId) && isUuid(interviewId)) {
+    let documentItemId: string | null = null;
+    try {
+      const { data: docRow } = await supabase
+        .from('documents_checklist')
+        .select('id')
+        .eq('interview_id', interviewId)
+        .eq('item_number', itemNumber)
+        .maybeSingle();
+      if (docRow?.id) {
+        documentItemId = docRow.id;
+      }
+    } catch {
+      // Non-blocking lookup
+    }
+
+    const { error: fileInsertErr } = await supabase.from('interview_files').insert([
+      {
+        interview_id: interviewId,
+        document_item_id: documentItemId,
+        file_name: file.name,
+        file_size_bytes: file.size,
+        mime_type: file.type || 'application/octet-stream',
+        storage_path: storagePath,
+        uploaded_by: effectiveUserId,
+      },
+    ]);
+
+    if (fileInsertErr) {
+      console.warn('Notice: public.interview_files insert returned:', fileInsertErr.message);
+    }
+  }
+
+  // 5. Update public.documents_checklist.file_url in database
+  if (isUuid(interviewId)) {
+    try {
+      await supabase
+        .from('documents_checklist')
+        .update({
+          file_url: storagePath,
+          collected_status: 'Collected',
+          exists_status: 'Yes',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('interview_id', interviewId)
+        .eq('item_number', itemNumber);
+    } catch (checklistUpdateErr) {
+      console.warn('Notice: updating documents_checklist table returned:', checklistUpdateErr);
+    }
+  }
+
+  return {
+    storagePath,
+    url: accessUrl,
+    fileName: file.name,
+  };
+}
+
+/**
+ * Generates a fresh signed URL (1-hour expiry = 3600 seconds) for private storage path or signed URL
+ */
+export async function getDocumentSignedUrl(
+  fileUrlOrPath: string,
+  expiresInSeconds: number = 3600
+): Promise<string> {
+  if (!fileUrlOrPath) {
+    throw new Error('No document file path specified.');
+  }
+
+  if (fileUrlOrPath.startsWith('#demo-') || fileUrlOrPath.startsWith('#')) {
+    return fileUrlOrPath;
+  }
+
+  if (!isSupabaseConfigured) {
+    return fileUrlOrPath;
+  }
+
+  // Extract storage path if passed an existing signed/public URL
+  let storagePath = fileUrlOrPath;
+  if (fileUrlOrPath.includes('/interview-documents/')) {
+    const afterBucket = fileUrlOrPath.split('/interview-documents/')[1];
+    storagePath = decodeURIComponent(afterBucket.split('?')[0]);
+  }
+
   try {
-    // 1. Upload to Supabase Storage 'interview-documents'
-    const { data: uploadData, error: uploadErr } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('interview-documents')
-      .upload(storagePath, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type || 'application/octet-stream',
-      });
+      .createSignedUrl(storagePath, expiresInSeconds);
 
-    if (uploadErr) {
-      console.warn('Notice: Supabase storage upload returned:', uploadErr.message);
+    if (error || !data?.signedUrl) {
+      const userMsg = parseStorageError(error || 'Failed to generate signed download link.');
+      throw new Error(userMsg);
     }
 
-    // 2. Generate a secure signed URL (valid for 24 hours) for private bucket access
-    let accessUrl = `#${file.name}`;
-    const { data: signedUrlData, error: signErr } = await supabase.storage
-      .from('interview-documents')
-      .createSignedUrl(storagePath, 60 * 60 * 24);
-
-    if (!signErr && signedUrlData?.signedUrl) {
-      accessUrl = signedUrlData.signedUrl;
-    } else if (uploadData?.path) {
-      accessUrl = uploadData.path;
-    }
-
-    // 3. Record attachment in interview_files table if user id is UUID
-    if (uploadedByUserId && isUuid(uploadedByUserId) && isUuid(interviewId)) {
-      await supabase.from('interview_files').insert([
-        {
-          interview_id: interviewId,
-          file_name: file.name,
-          file_size_bytes: file.size,
-          mime_type: file.type || 'application/octet-stream',
-          storage_path: storagePath,
-          uploaded_by: uploadedByUserId,
-        },
-      ]);
-    }
-
-    return {
-      storagePath,
-      url: accessUrl,
-      fileName: file.name,
-    };
-  } catch (err) {
-    console.warn('Error during Supabase file upload:', err);
-    return {
-      storagePath,
-      url: `#${file.name}`,
-      fileName: file.name,
-    };
+    return data.signedUrl;
+  } catch (err: any) {
+    const userMsg = parseStorageError(err);
+    throw new Error(userMsg);
   }
 }

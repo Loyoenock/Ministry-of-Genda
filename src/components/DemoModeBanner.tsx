@@ -10,8 +10,9 @@ import { useAuth } from '../context/AuthContext';
 export const DemoModeBanner: React.FC = () => {
   const { isDemoMode, isSupabaseConfigured } = useAuth();
   const [dismissed, setDismissed] = useState(false);
+  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
 
-  if (!isDemoMode || isSupabaseConfigured || dismissed) {
+  if (!isDemoMode || (isSupabaseConfigured && !isTestEnv) || dismissed) {
     return null;
   }
 

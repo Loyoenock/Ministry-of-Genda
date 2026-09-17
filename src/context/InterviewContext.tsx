@@ -18,7 +18,12 @@ import { useAnswersState } from '../hooks/useAnswersState';
 import { useChecklistState } from '../hooks/useChecklistState';
 import { useNotesState } from '../hooks/useNotesState';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { isUuid, fetchOrInitChecklistFromSupabase, fetchOrInitNotesFromSupabase } from '../lib/interviewService';
+import {
+  isUuid,
+  fetchOrInitChecklistFromSupabase,
+  fetchOrInitNotesFromSupabase,
+  removeDemoStorageEntriesForInterview,
+} from '../lib/interviewService';
 
 export interface InterviewContextType {
   interviews: Interview[];
@@ -162,6 +167,17 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [checklistState, interviewRecords]
   );
 
+  const handleDeleteInterview = useCallback(
+    (id: string) => {
+      interviewRecords.deleteInterview(id);
+      answersState.removeAnswersForInterview(id);
+      checklistState.removeChecklistForInterview(id);
+      notesState.removeNotesForInterview(id);
+      removeDemoStorageEntriesForInterview(id);
+    },
+    [interviewRecords, answersState, checklistState, notesState]
+  );
+
   return (
     <InterviewContext.Provider
       value={{
@@ -180,7 +196,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         selectInterview: interviewRecords.selectInterview,
         createInterview: interviewRecords.createInterview,
         updateInterview: interviewRecords.updateInterview,
-        deleteInterview: interviewRecords.deleteInterview,
+        deleteInterview: handleDeleteInterview,
         getInterviewAnswers: answersState.getInterviewAnswers,
         saveAnswer: answersState.saveAnswer,
         getInterviewChecklist: checklistState.getInterviewChecklist,

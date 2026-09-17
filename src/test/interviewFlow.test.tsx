@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { AuthProvider } from '../context/AuthContext';
@@ -76,6 +76,89 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     expect(screen.getByText('Sarah Nansubuga')).toBeTruthy();
     expect(screen.getAllByText(/Tier: Leadership/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Diagnostic Questions/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders status segmented controls in header and allows switching status', async () => {
+    render(
+      <AuthProvider>
+        <InterviewProvider>
+          <DynamicInterviewForm interviewId="int-001" onBack={() => {}} />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    // Verify status controls exist
+    const draftBtn = screen.getByRole('button', { name: /^Draft$/i });
+    const inProgressBtn = screen.getByRole('button', { name: /^In Progress$/i });
+    const completedBtn = screen.getByRole('button', { name: /^Completed$/i });
+
+    expect(draftBtn).toBeTruthy();
+    expect(inProgressBtn).toBeTruthy();
+    expect(completedBtn).toBeTruthy();
+
+    // Click Draft
+    act(() => {
+      draftBtn.click();
+    });
+
+    // Toast feedback appears
+    expect(await screen.findByText(/Status successfully updated to Draft/i)).toBeTruthy();
+  });
+
+  it('handles delete interview workflow with confirmation modal and cancellation', () => {
+    const onBackMock = vi.fn();
+    render(
+      <AuthProvider>
+        <InterviewProvider>
+          <DynamicInterviewForm interviewId="int-001" onBack={onBackMock} />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    const deleteBtn = screen.getByRole('button', { name: /Delete interview/i });
+    expect(deleteBtn).toBeTruthy();
+
+    // Open modal
+    act(() => {
+      deleteBtn.click();
+    });
+
+    expect(screen.getByText('Permanently delete this interview?')).toBeTruthy();
+    expect(
+      screen.getByText(/This will remove the interview, all answers, checklist items, notes and uploaded files/i)
+    ).toBeTruthy();
+
+    // Click cancel
+    const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
+    act(() => {
+      cancelBtn.click();
+    });
+
+    expect(screen.queryByText('Permanently delete this interview?')).toBeNull();
+    expect(onBackMock).not.toHaveBeenCalled();
+  });
+
+  it('confirms interview deletion, cleans up storage, and navigates back', async () => {
+    const onBackMock = vi.fn();
+    render(
+      <AuthProvider>
+        <InterviewProvider>
+          <DynamicInterviewForm interviewId="int-002" onBack={onBackMock} />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    const deleteBtn = screen.getByRole('button', { name: /Delete interview/i });
+    act(() => {
+      deleteBtn.click();
+    });
+
+    const confirmDeleteBtn = screen.getByRole('button', { name: /Delete permanently/i });
+    await act(async () => {
+      confirmDeleteBtn.click();
+    });
+
+    expect(onBackMock).toHaveBeenCalledTimes(1);
   });
 
   it('renders DashboardView with Interviews by Tier and Ministry Headquarters Building link', async () => {

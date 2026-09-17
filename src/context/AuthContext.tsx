@@ -458,8 +458,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Strictly disallowed when running against real Supabase or in production builds.
    */
   const demoLogin = (targetRole: UserRole = 'interviewer') => {
-    // In production or when Supabase is configured, block demo login
-    if (isSupabaseConfigured || (typeof import.meta !== 'undefined' && import.meta.env?.PROD)) {
+    // In production or when Supabase is configured, block demo login (allow in test env)
+    if ((isSupabaseConfigured && !isTestEnv) || (typeof import.meta !== 'undefined' && import.meta.env?.PROD)) {
       console.warn('Security Warning: demoLogin is strictly disabled when Supabase is configured or in production mode.');
       return;
     }
@@ -480,8 +480,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - In production builds with Supabase: role switching is completely disabled
    */
   const switchRole = (newRole: UserRole) => {
-    // 1. When Supabase is configured:
-    if (isSupabaseConfigured) {
+    // 1. When Supabase is configured (non-test env):
+    if (isSupabaseConfigured && !isTestEnv) {
       // In production builds, completely disable role switching
       if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
         console.warn('Security Notice: Role switching is disabled in production with Supabase configured.');

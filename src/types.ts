@@ -58,6 +58,7 @@ export interface DocumentItem {
   follow_up_action: string;
   file_url?: string;
   file_name?: string;
+  storage_path?: string;
 }
 
 export interface NumbersCaptured {

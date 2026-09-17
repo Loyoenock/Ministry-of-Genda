@@ -20,6 +20,7 @@ export function useInterviewFormState(interviewId: string) {
     saveNotes,
     uploadDocumentFile,
     updateInterview,
+    deleteInterview,
     autoSaveStatus,
   } = useInterviews();
 
@@ -140,6 +141,7 @@ export function useInterviewFormState(interviewId: string) {
     updateChecklistItem,
     uploadDocumentFile,
     updateInterview,
+    deleteInterview,
     autoSaveStatus,
   };
 }

@@ -105,6 +105,14 @@ export function useChecklistState({
     });
   }, []);
 
+  const removeChecklistForInterview = useCallback((interviewId: string) => {
+    setChecklistsMap((prev) => {
+      const copy = { ...prev };
+      delete copy[interviewId];
+      return copy;
+    });
+  }, []);
+
   const loadChecklistFromSupabase = useCallback(async (interviewId: string) => {
     if (!isSupabaseConfigured || !isUuid(interviewId)) return;
     try {
@@ -156,16 +164,23 @@ export function useChecklistState({
 
       const fileName = typeof fileOrName === 'string' ? fileOrName : fileOrName.name;
 
-      // 1. Optimistic checklist item update
+      // 1. Snapshot previous item for optimistic rollback on error
+      const currentItems = checklistsMap[interviewId] || [];
+      const previousItem = currentItems.find((i) => i.item_number === itemNumber);
+      const previousSnapshot = previousItem ? { ...previousItem } : null;
+
+      // 2. Optimistic checklist item update
+      const initialFileUrl = `#demo-${fileName}`;
       updateChecklistItem(interviewId, itemNumber, {
         collected_status: 'Collected',
         exists_status: 'Yes',
         file_name: fileName,
-        file_url: `#${fileName}`,
+        file_url: initialFileUrl,
+        storage_path: initialFileUrl,
       });
 
-      // 2. Real upload to Supabase Storage if File instance
-      let finalUrl = `#${fileName}`;
+      // 3. Real upload to Supabase Storage if File instance and Supabase is configured
+      let finalUrl = initialFileUrl;
       if (fileOrName instanceof File && isSupabaseConfigured) {
         try {
           const uploadResult = await uploadFileToSupabaseStorage(
@@ -176,19 +191,36 @@ export function useChecklistState({
           );
           finalUrl = uploadResult.url;
 
-          // Update with permanent signed URL / storage path
+          // Update with persistent storage path and file_name
           updateChecklistItem(interviewId, itemNumber, {
-            file_url: uploadResult.url,
+            file_url: uploadResult.storagePath,
             file_name: uploadResult.fileName,
+            storage_path: uploadResult.storagePath,
+            collected_status: 'Collected',
+            exists_status: 'Yes',
           });
-        } catch (uploadErr) {
-          console.warn('Storage upload notice:', uploadErr);
+          setAutoSaveStatus('saved');
+        } catch (uploadErr: any) {
+          // Rollback optimistic UI on failure
+          if (previousSnapshot) {
+            updateChecklistItem(interviewId, itemNumber, {
+              collected_status: previousSnapshot.collected_status,
+              exists_status: previousSnapshot.exists_status,
+              file_name: previousSnapshot.file_name,
+              file_url: previousSnapshot.file_url,
+              storage_path: previousSnapshot.storage_path,
+              notes: previousSnapshot.notes,
+              follow_up_action: previousSnapshot.follow_up_action,
+            });
+          }
+          setAutoSaveStatus('error');
+          throw uploadErr;
         }
+      } else {
+        setAutoSaveStatus('saved');
       }
 
-      setAutoSaveStatus('saved');
-
-      // 3. Record recent activity item
+      // 4. Record recent activity item
       if (addRecentActivity) {
         addRecentActivity({
           id: `act-${Date.now()}`,
@@ -201,13 +233,14 @@ export function useChecklistState({
 
       return finalUrl;
     },
-    [addRecentActivity, setAutoSaveStatus, updateChecklistItem, userId]
+    [addRecentActivity, checklistsMap, setAutoSaveStatus, updateChecklistItem, userId]
   );
 
   return {
     checklistsMap,
     getInterviewChecklist,
     initChecklistForInterview,
+    removeChecklistForInterview,
     loadChecklistFromSupabase,
     updateChecklistItem,
     uploadDocumentFile,

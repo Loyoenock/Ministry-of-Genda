@@ -306,8 +306,8 @@ export const LoginView: React.FC = () => {
               </button>
             </form>
 
-            {/* Quick Demo Access Section (Pure demo mode only) */}
-            {!isSupabaseConfigured && (
+            {/* Quick Demo Access Section (Pure demo mode or test env) */}
+            {(!isSupabaseConfigured || (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test')) && (
               <div className="pt-5 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">

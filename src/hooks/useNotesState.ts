@@ -96,6 +96,17 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     });
   }, []);
 
+  const removeNotesForInterview = useCallback((interviewId: string) => {
+    if (saveNotesTimer.current) {
+      clearTimeout(saveNotesTimer.current);
+    }
+    setNotesMap((prev) => {
+      const copy = { ...prev };
+      delete copy[interviewId];
+      return copy;
+    });
+  }, []);
+
   const loadNotesFromSupabase = useCallback(async (interviewId: string) => {
     if (!isSupabaseConfigured || !isUuid(interviewId)) return;
     try {
@@ -153,6 +164,7 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     notesMap,
     getInterviewNotes,
     initNotesForInterview,
+    removeNotesForInterview,
     loadNotesFromSupabase,
     saveNotes,
   };

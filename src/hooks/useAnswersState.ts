@@ -100,6 +100,18 @@ export function useAnswersState({
     }));
   }, []);
 
+  const removeAnswersForInterview = useCallback((interviewId: string) => {
+    if (saveAnswerTimers.current[interviewId]) {
+      clearTimeout(saveAnswerTimers.current[interviewId]);
+      delete saveAnswerTimers.current[interviewId];
+    }
+    setAnswersMap((prev) => {
+      const copy = { ...prev };
+      delete copy[interviewId];
+      return copy;
+    });
+  }, []);
+
   const loadAnswersFromSupabase = useCallback(async (interviewId: string) => {
     if (!isSupabaseConfigured || !isUuid(interviewId)) return;
     try {
@@ -209,5 +221,6 @@ export function useAnswersState({
     saveAnswer,
     loadAnswersFromSupabase,
     initAnswersForInterview,
+    removeAnswersForInterview,
   };
 }
