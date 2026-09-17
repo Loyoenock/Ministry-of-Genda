@@ -255,6 +255,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
           return (
             <div
               key={item.item_number}
+              data-testid={`checklist-item-${item.item_number}`}
               className={`bg-white rounded-2xl border p-5 transition shadow-xs ${
                 isCollected
                   ? 'border-teal-200/90 bg-teal-50/10'
@@ -322,6 +323,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
                       {(['Collected', 'Not Collected', 'Requested', 'Not Applicable'] as const).map((col) => (
                         <button
                           key={col}
+                          data-testid={`col-status-${item.item_number}-${col.replace(/\s+/g, '-').toLowerCase()}`}
                           onClick={() =>
                             onUpdateChecklistItem(interviewId, item.item_number, {
                               collected_status: col,

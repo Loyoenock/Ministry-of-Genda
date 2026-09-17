@@ -149,6 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
                 setDropdownOpen(!dropdownOpen);
                 setShowNotifications(false);
               }}
+              data-testid="header-user-menu-btn"
               aria-label="User profile and role menu"
               className="flex items-center space-x-1.5 sm:space-x-2.5 p-1 rounded-lg hover:bg-slate-800/80 transition focus:outline-none min-h-[44px]"
             >
@@ -158,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
                 referrerPolicy="no-referrer"
                 className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/40 shrink-0"
               />
-              <div className="text-left hidden md:block max-w-[140px] truncate">
+              <div className="text-left hidden md:block max-w-[140px] truncate" data-testid="header-user-role-badge">
                 <div className="text-xs font-semibold text-white flex items-center space-x-1.5 truncate">
                   <span className="truncate">{user.full_name.split(' ')[0]}</span>
                   {role === 'admin' ? (
@@ -202,6 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       <button
+                        data-testid="header-switch-role-interviewer"
                         onClick={() => {
                           switchRole('interviewer');
                           setDropdownOpen(false);
@@ -216,6 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <span>Interviewer</span>
                       </button>
                       <button
+                        data-testid="header-switch-role-admin"
                         onClick={() => {
                           switchRole('admin');
                           setDropdownOpen(false);
@@ -252,6 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                   {role === 'admin' && (
                     <button
+                      data-testid="header-user-management-btn"
                       onClick={() => {
                         onNavigate('admin-users');
                         setDropdownOpen(false);
@@ -266,6 +270,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <div className="border-t border-slate-100 px-4 pt-2 pb-1 space-y-1">
                   <button
+                    data-testid="header-sign-out-btn"
                     onClick={() => {
                       logout();
                       setDropdownOpen(false);

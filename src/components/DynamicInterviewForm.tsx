@@ -183,6 +183,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-interview-title"
+          data-testid="confirm-delete-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
         >
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
@@ -216,6 +217,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             <div className="flex items-center justify-end space-x-3 pt-2">
               <button
                 type="button"
+                data-testid="cancel-delete-btn"
                 onClick={() => setDeleteModalOpen(false)}
                 disabled={isDeleting}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition min-h-[42px]"
@@ -224,6 +226,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
               </button>
               <button
                 type="button"
+                data-testid="confirm-delete-btn"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
                 className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition flex items-center space-x-2 min-h-[42px] shadow-sm"
@@ -252,6 +255,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           <div className="flex items-start space-x-3">
             <button
               onClick={onBack}
+              data-testid="back-to-dashboard-btn"
               className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
               title="Return to Directory"
               aria-label="Back to dashboard"
@@ -261,12 +265,13 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
 
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200" data-testid="interview-tier-badge">
                   Tier: {interview.tier}
                 </span>
 
                 {/* Status Badge with consistent colours matching DashboardView */}
                 <span
+                  data-testid="status-badge"
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-colors ${
                     interview.status === 'Completed'
                       ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -286,6 +291,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                 >
                   <button
                     type="button"
+                    data-testid="status-btn-draft"
                     onClick={() => handleStatusChange('Draft')}
                     disabled={!canModify}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -303,6 +309,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                   </button>
                   <button
                     type="button"
+                    data-testid="status-btn-in-progress"
                     onClick={() => handleStatusChange('In Progress')}
                     disabled={!canModify}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -320,6 +327,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                   </button>
                   <button
                     type="button"
+                    data-testid="status-btn-completed"
                     onClick={() => handleStatusChange('Completed')}
                     disabled={isCompletedOptionDisabled}
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -404,6 +412,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
             {canModify && (
               <button
                 type="button"
+                data-testid="delete-interview-btn"
                 onClick={() => setDeleteModalOpen(true)}
                 className="px-3 py-2 bg-white hover:bg-rose-50 active:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/90 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[40px] shadow-2xs"
                 title="Permanently delete this interview"
@@ -467,12 +476,13 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
               <span className="font-bold text-slate-700">
                 Diagnostic Questions Progress
               </span>
-              <span className="font-bold text-teal-700">
+              <span className="font-bold text-teal-700" data-testid="progress-percentage-text">
                 {answeredCount} of {applicableQuestions.length} answered ({overallPercentage}%)
               </span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
               <div
+                data-testid="progress-bar"
                 className="bg-teal-700 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${overallPercentage}%` }}
               />
@@ -504,6 +514,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
       {/* Tab Navigation: Questions, Documents, Interviewer Notes */}
       <div className="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-2xl max-w-lg">
         <button
+          data-testid="tab-questionnaire"
           onClick={() => setActiveTab('questionnaire')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 min-h-[42px] ${
             activeTab === 'questionnaire'
@@ -516,6 +527,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
         </button>
 
         <button
+          data-testid="tab-documents"
           onClick={() => setActiveTab('documents')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 min-h-[42px] ${
             activeTab === 'documents'
@@ -528,6 +540,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
         </button>
 
         <button
+          data-testid="tab-notes"
           onClick={() => setActiveTab('notes')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 min-h-[42px] ${
             activeTab === 'notes'

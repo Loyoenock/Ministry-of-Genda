@@ -43,6 +43,11 @@ export const LoginView: React.FC = () => {
       return;
     }
 
+    if (!email.includes('@') || !email.includes('.')) {
+      setErrorMessage('Please enter a valid ministry email address.');
+      return;
+    }
+
     if (isSupabaseConfigured && !password.trim()) {
       setErrorMessage('Please enter your account password.');
       return;
@@ -153,6 +158,7 @@ export const LoginView: React.FC = () => {
               <button
                 type="button"
                 id="login-tab-signin"
+                data-testid="login-tab-signin"
                 onClick={() => {
                   setMode('signin');
                   setErrorMessage(null);
@@ -169,6 +175,7 @@ export const LoginView: React.FC = () => {
               <button
                 type="button"
                 id="login-tab-signup"
+                data-testid="login-tab-signup"
                 onClick={() => {
                   setMode('signup');
                   setErrorMessage(null);
@@ -188,6 +195,7 @@ export const LoginView: React.FC = () => {
             {errorMessage && (
               <div
                 id="login-error-alert"
+                data-testid="login-error-alert"
                 className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-start space-x-2.5 animate-in fade-in"
               >
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -199,6 +207,7 @@ export const LoginView: React.FC = () => {
             {successMessage && (
               <div
                 id="login-success-alert"
+                data-testid="login-success-alert"
                 className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-start space-x-2.5 animate-in fade-in"
               >
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
@@ -216,6 +225,7 @@ export const LoginView: React.FC = () => {
                     </label>
                     <input
                       id="login-fullname"
+                      data-testid="login-fullname"
                       type="text"
                       required
                       placeholder="e.g. John Okello"
@@ -231,6 +241,7 @@ export const LoginView: React.FC = () => {
                     </label>
                     <input
                       id="login-department"
+                      data-testid="login-department"
                       type="text"
                       placeholder="e.g. Labour Inspectorate"
                       value={department}
@@ -249,6 +260,7 @@ export const LoginView: React.FC = () => {
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="login-email"
+                    data-testid="login-email"
                     type="email"
                     required
                     placeholder="officer@mglsd.go.ug"
@@ -272,6 +284,7 @@ export const LoginView: React.FC = () => {
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="login-password"
+                    data-testid="login-password"
                     type={showPassword ? 'text' : 'password'}
                     required={isSupabaseConfigured}
                     placeholder={isSupabaseConfigured ? '••••••••' : 'Enter password or leave blank'}
@@ -292,6 +305,7 @@ export const LoginView: React.FC = () => {
               <button
                 type="submit"
                 id="login-submit-btn"
+                data-testid="login-submit-btn"
                 disabled={isSubmitting}
                 className="w-full mt-2 py-3 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition shadow-md hover:shadow-lg disabled:opacity-50 min-h-[44px]"
               >
@@ -322,6 +336,7 @@ export const LoginView: React.FC = () => {
                   <button
                     type="button"
                     id="login-demo-interviewer-btn"
+                    data-testid="login-demo-interviewer-btn"
                     onClick={() => demoLogin('interviewer')}
                     className="p-3 text-left border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
                   >
@@ -335,6 +350,7 @@ export const LoginView: React.FC = () => {
                   <button
                     type="button"
                     id="login-demo-admin-btn"
+                    data-testid="login-demo-admin-btn"
                     onClick={() => demoLogin('admin')}
                     className="p-3 text-left border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
                   >

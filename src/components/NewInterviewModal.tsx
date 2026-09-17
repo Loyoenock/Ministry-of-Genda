@@ -143,6 +143,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                 <input
                   type="text"
                   required
+                  data-testid="interviewee-name-input"
                   placeholder="e.g. Dr. Jane Tumuhimbise"
                   value={intervieweeName}
                   onChange={(e) => {
@@ -160,6 +161,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                 <input
                   type="text"
                   required
+                  data-testid="interviewee-role-input"
                   placeholder="e.g. Commissioner for Labour"
                   value={roleTitle}
                   onChange={(e) => {
@@ -176,6 +178,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  data-testid="interviewee-dept-input"
                   placeholder="e.g. Department of OSH"
                   value={departmentUnit}
                   onChange={(e) => setDepartmentUnit(e.target.value)}
@@ -216,6 +219,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                   <button
                     key={t}
                     type="button"
+                    data-testid={`tier-option-${t}`}
                     onClick={() => setTier(t)}
                     className={`p-3 text-left rounded-xl border-2 transition-all flex flex-col justify-between relative min-h-[44px] ${
                       isSelected
@@ -302,6 +306,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
           <div className="pt-3 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:space-x-3 shrink-0">
             <button
               type="button"
+              data-testid="create-interview-cancel-btn"
               onClick={onClose}
               className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition min-h-[42px]"
             >
@@ -309,6 +314,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
             </button>
             <button
               type="submit"
+              data-testid="create-interview-submit-btn"
               className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 rounded-xl shadow-sm transition flex items-center justify-center space-x-1.5 min-h-[42px]"
             >
               <span>Initialize Diagnostic Interview</span>

@@ -129,6 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
+                data-testid={`sidebar-nav-${item.id}`}
                 onClick={() => handleItemClick(item.id, item.action)}
                 className={`w-full flex items-center space-x-3 px-3.5 py-3 sm:py-2.5 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
                   isActive
@@ -149,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Admin Navigation Section */}
         {isAdmin && (
-          <div className="mt-5 pt-4 border-t border-slate-800">
+          <div className="mt-5 pt-4 border-t border-slate-800" data-testid="sidebar-admin-section">
             <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-purple-400 mb-2">
               National Oversight (Admin)
             </p>
@@ -160,6 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <button
                     key={item.id}
+                    data-testid={`sidebar-nav-${item.id}`}
                     onClick={() => handleItemClick(item.id)}
                     className={`w-full flex items-center space-x-3 px-3.5 py-3 sm:py-2.5 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
                       isActive
@@ -191,6 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
+                data-testid={`sidebar-nav-${item.id}`}
                 onClick={() => handleItemClick(item.id)}
                 className={`w-full flex items-center space-x-3 px-3.5 py-3 sm:py-2.5 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
                   isActive

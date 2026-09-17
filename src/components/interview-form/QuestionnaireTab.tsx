@@ -74,6 +74,7 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
             return (
               <button
                 key={sec.code}
+                data-testid={`mobile-section-nav-${sec.code}`}
                 onClick={() => onSelectSection(sec.code)}
                 className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 min-h-[42px] ${
                   isCurrent
@@ -116,6 +117,7 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
             return (
               <button
                 key={sec.code}
+                data-testid={`section-nav-${sec.code}`}
                 onClick={() => onSelectSection(sec.code)}
                 className={`w-full text-left p-2.5 rounded-xl text-xs font-medium transition flex items-center justify-between ${
                   isCurrent
@@ -232,6 +234,7 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
                   </label>
                   <textarea
                     id={`answer-${q.id}`}
+                    data-testid={`question-input-${q.id}`}
                     rows={4}
                     placeholder="Record detailed response, direct quotes, statutory references, or observed operational bottlenecks..."
                     value={currentAnswer}

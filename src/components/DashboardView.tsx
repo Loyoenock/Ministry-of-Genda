@@ -485,6 +485,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
+                    data-testid="dashboard-search-input"
                     placeholder="Search by interviewee, organisation..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -495,6 +496,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {/* Tier Filter */}
                 <select
                   value={tierFilter}
+                  data-testid="dashboard-tier-filter"
                   onChange={(e) => setTierFilter(e.target.value)}
                   className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-medium text-slate-700 outline-none focus:ring-2 focus:ring-teal-500"
                 >
@@ -508,6 +510,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {/* Status Filter */}
                 <select
                   value={statusFilter}
+                  data-testid="dashboard-status-filter"
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-medium text-slate-700 outline-none focus:ring-2 focus:ring-teal-500"
                 >
@@ -520,6 +523,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {(searchQuery || tierFilter !== 'All Tiers' || statusFilter !== 'All Statuses') && (
                   <button
                     onClick={clearFilters}
+                    data-testid="dashboard-clear-filters-btn"
                     className="text-xs text-teal-700 hover:text-teal-900 font-semibold px-2 py-1.5"
                   >
                     Clear
@@ -612,7 +616,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Desktop / Tablet Table Content (hidden on small screens < md) */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600">
+              <table className="w-full text-left text-xs text-slate-600" data-testid="dashboard-interviews-table">
                 <thead className="bg-slate-50/80 text-slate-600 uppercase font-semibold text-[11px] border-b border-slate-200">
                   <tr>
                     <th className="p-3.5 w-10 text-center">
@@ -637,7 +641,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {filteredInterviews.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-slate-400">
+                      <td colSpan={9} className="py-8 text-center text-slate-400" data-testid="no-interviews-matched">
                         No interviews match the current filter criteria.
                       </td>
                     </tr>
@@ -647,6 +651,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       return (
                         <tr
                           key={item.id}
+                          data-testid={`interview-row-${item.id}`}
                           className={`hover:bg-slate-50/80 transition-colors ${
                             isSelected ? 'bg-teal-50/40' : ''
                           }`}
@@ -663,6 +668,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <td className="py-3 px-2 font-medium text-slate-500">{index + 1}</td>
                           <td className="py-3 px-4">
                             <button
+                              data-testid={`open-interview-${item.id}`}
                               onClick={() => onOpenInterview(item.id)}
                               className="text-left font-bold text-slate-900 hover:text-teal-700 transition block"
                             >
@@ -852,6 +858,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Big Primary New Interview Button */}
             <button
+              data-testid="dashboard-new-interview-btn"
               onClick={onOpenNewInterview}
               className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center space-x-2 text-xs sm:text-sm"
             >

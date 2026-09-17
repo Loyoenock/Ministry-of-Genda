@@ -63,6 +63,7 @@ export const NotesTab: React.FC<NotesTabProps> = ({
             </label>
             <textarea
               id="notes-observations"
+              data-testid="notes-observations"
               rows={4}
               placeholder="e.g. Officer was exceptionally forthcoming regarding inspectorate staffing shortages, but guarded about revenue remissions..."
               value={localNotes.observations || ''}
