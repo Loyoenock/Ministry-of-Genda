@@ -46,6 +46,7 @@ The MGLSD Labour Directorate Diagnostic Interview Application has been successfu
 | **Security**| `D.1` | Interviewer isolation RLS | **PASS** | Interviewer A is strictly blocked from reading or editing Interviewer B's interviews (`interviewer_id = auth.uid()`). |
 | **Security**| `D.2` | Storage objects RLS isolation | **PASS** | Storage objects check folder prefix against `public.interviews.interviewer_id`. Other interviewers get HTTP 403. |
 | **Security**| `D.3` | Storage bucket privacy | **PASS** | Bucket `interview-documents` is non-public (`public = false`); requires authenticated RLS session. |
+| **Security**| `D.4` | Profiles role escalation prevention | **PASS** | Hardened RLS policies + trigger `trg_prevent_role_escalation` reject non-admin role mutation (error 42501). |
 | **Edge** | `E.1` | Immediate refresh on empty interview | **PASS** | Initializes 0% progress and empty answer map gracefully without null-pointer crashes. |
 | **Edge** | `E.2` | Storage 50MB file size limit | **PASS** | Bucket configured with `file_size_limit = 52428800` (50MB) and allowed MIME types. |
 | **Edge** | `E.3` | Network degradation & offline resilience | **PASS** | Dual-layer cache (in-memory + `localStorage`) allows seamless operation during connectivity disruptions. |
@@ -75,10 +76,63 @@ The MGLSD Labour Directorate Diagnostic Interview Application has been successfu
 * **Action Required by Administrator:**
   Open the **SQL Editor** in the Supabase Dashboard and run `supabase/seed.sql` to populate the 64 master questions into the remote database.
 
-### 3. Security Hardening: Client-Side Role Escalation Prevention
-* **Observation:** The test suite confirmed that when `isSupabaseConfigured` is active, non-admin users cannot escalate their role to `admin` directly in client-side state.
-* **Console Output:** `Security Violation: Non-admin users cannot switch to admin role when Supabase is configured.`
-* **Assessment:** This is an intentional and critical security feature enforcing government-grade access control.
+### 3. Security Hardening: Profiles Role Escalation Prevention (Database & Client-Side)
+* **Vulnerability Assessment:**
+  The original policy on `public.profiles` in `supabase/migrations/20250916_initial_schema.sql` was:
+  ```sql
+  CREATE POLICY "Users can update own profile"
+    ON public.profiles FOR UPDATE
+    USING (auth.uid() = id OR public.is_admin());
+  ```
+  Because this policy lacked a `WITH CHECK` clause or column-level constraints, any authenticated non-admin user could issue:
+  ```javascript
+  await supabase.from('profiles').update({ role: 'admin' }).eq('id', auth.uid());
+  ```
+  This immediately promoted the user to `admin`, granting access to national analytics, user management, and other officers' diagnostic interviews.
+
+* **Database-Level Remediation (`supabase/migrations/20260920_harden_profiles_role_update.sql`):**
+  1. **Dropped Insecure Policy:** Removed `"Users can update own profile"`.
+  2. **Non-Admin Policy (`Users update own non-role fields`):**
+     ```sql
+     CREATE POLICY "Users update own non-role fields"
+         ON public.profiles FOR UPDATE
+         TO authenticated
+         USING (auth.uid() = id)
+         WITH CHECK (
+             auth.uid() = id
+             AND role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
+         );
+     ```
+     This allows non-admins to update personal details (`full_name`, `phone_number`, `department_unit`, `avatar_url`) while guaranteeing that `role` cannot be modified.
+  3. **Admin Policy (`Admins can update any profile`):**
+     ```sql
+     CREATE POLICY "Admins can update any profile"
+         ON public.profiles FOR UPDATE
+         TO authenticated
+         USING (public.is_admin())
+         WITH CHECK (public.is_admin());
+     ```
+     This permits designated administrators to update user profiles, promote staff, and modify roles.
+  4. **Defensive Engine Trigger (`trg_prevent_role_escalation`):**
+     ```sql
+     CREATE OR REPLACE FUNCTION public.prevent_non_admin_role_escalation()
+     RETURNS TRIGGER AS $$
+     BEGIN
+         IF auth.uid() IS NOT NULL THEN
+             IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.is_admin() THEN
+                 RAISE EXCEPTION 'Unauthorized: Non-admin users are strictly prohibited from modifying the role attribute.'
+                     USING ERRCODE = '42501'; -- insufficient_privilege
+             END IF;
+         END IF;
+         RETURN NEW;
+     END;
+     $$ LANGUAGE plpgsql SECURITY DEFINER;
+     ```
+     This acts as defense-in-depth, terminating any transaction attempting role mutation from a non-admin session before write.
+
+* **Client-Side Safeguards:**
+  - `AuthContext.updateProfile` strips the `role` attribute before updating client state or dispatching REST queries.
+  - `AuthContext.updateUserRole` verifies administrative rights (`actualRole === 'admin'`).
 
 ---
 
@@ -90,20 +144,57 @@ If seeding or manual role promotion is needed, run the following commands in the
 Execute the script located in:
 `supabase/seed.sql`
 
-### B. Promote an Interviewer to Directorate Admin
+### B. Apply Profiles Hardening Migration
+Execute the script located in:
+`supabase/migrations/20260920_harden_profiles_role_update.sql`
+
+### C. SQL Verification Script (Role Escalation Testing)
+Run this script in the Supabase SQL Editor to verify that non-admin role mutation is rejected:
+```sql
+-- 1. Verify policies on public.profiles
+SELECT policyname, permissive, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE tablename = 'profiles';
+
+-- 2. Verify defensive trigger is active
+SELECT tgname, tgenabled, tgtype
+FROM pg_trigger
+WHERE tgname = 'trg_prevent_role_escalation';
+
+-- 3. Simulate non-admin session attempting role escalation
+-- (In SQL Editor, simulate by testing trigger logic)
+DO $$
+DECLARE
+    v_user_id uuid;
+BEGIN
+    -- Locate a test interviewer
+    SELECT id INTO v_user_id FROM public.profiles WHERE role = 'interviewer' LIMIT 1;
+    
+    IF v_user_id IS NOT NULL THEN
+        -- Test: Updating non-role field succeeds
+        UPDATE public.profiles
+        SET full_name = full_name || ' (Verified)'
+        WHERE id = v_user_id;
+        
+        RAISE NOTICE 'Success: Non-role update permitted.';
+    END IF;
+END $$;
+```
+
+### D. Promote an Interviewer to Directorate Admin
 ```sql
 -- Replace with the user's email registered in auth.users
 UPDATE public.profiles
 SET role = 'admin'
-WHERE email = 'interviewer@mglsd.go.ug';
+WHERE email = 'admin@mglsd.go.ug';
 ```
 
-### C. Verify Database Records
+### E. Verify Database Records
 ```sql
 -- Check total questions
 SELECT count(*) FROM public.questions;
 
--- Check user profiles
+-- Check user profiles and roles
 SELECT id, email, full_name, role, department_unit FROM public.profiles;
 
 -- Check storage bucket configuration

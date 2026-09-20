@@ -166,6 +166,8 @@ CREATE POLICY "Profiles viewable by self or admin"
     ON public.profiles FOR SELECT
     USING (auth.uid() = id OR public.is_admin());
 
+-- NOTE: "Users can update own profile" is superseded by migration 20260920_harden_profiles_role_update.sql
+-- which splits updates into non-role fields for self and admin-only role modifications.
 CREATE POLICY "Users can update own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = id OR public.is_admin());

@@ -282,6 +282,15 @@ This creates:
 - Allowed MIME types: PDF, Word (`.doc`, `.docx`), Excel (`.xls`, `.xlsx`), Images (`.jpg`, `.png`, `.webp`), and text/csv.
 - Storage RLS policies allowing upload, read, and delete operations only to the interview owner (`interviewer_id = auth.uid()`) or users with `role = 'admin'`.
 
+### Step 3b: Apply Profiles Security Hardening Migration
+In the **SQL Editor**, run the script from `supabase/migrations/20260920_harden_profiles_role_update.sql`.
+
+This resolves the role privilege escalation vector (`await supabase.from('profiles').update({ role: 'admin' }).eq('id', auth.uid())`):
+- **Drops Insecure Policy**: Drops legacy `"Users can update own profile"`.
+- **Enforces Non-Role RLS**: Creates `"Users update own non-role fields"` with a `WITH CHECK (auth.uid() = id AND role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid()))` constraint.
+- **Admin Role Management**: Creates `"Admins can update any profile"` permitting users where `public.is_admin() = true` to update any profile and manage roles.
+- **Engine-Level Trigger**: Adds `trg_prevent_role_escalation` which raises an `insufficient_privilege (42501)` exception if a non-admin attempts to mutate the `role` column.
+
 ### Step 4: Seed the Master Questions Catalog
 In the **SQL Editor**, run the script from `supabase/seed.sql`.
 - Inserts the complete MGLSD questionnaire across Section A (Strategy & Mandate), Section B (Institutional Structure), Section C (Labour Inspectorate), Section D (Dispute Resolution), Section E (Occupational Safety & Health), Section F (External Employment), Section G (Social Dialogue & Tripartite), Section H (Information Systems & Logistics), and Section W (Regional Workshop / Frontline).
@@ -301,7 +310,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 - **Interviewers** can only view and update interviews where `interviewer_id = auth.uid()`.
 - **Admins** bypass the `interviewer_id` filter via `public.is_admin()` and can view/manage all records nationwide.
-- All non-admin users are barred from escalating their own role or modifying the master questions catalogue.
+- **Profiles RLS & Trigger Hardening**: Non-admin users are strictly barred from altering their `role` column via client-side updates through policy `Users update own non-role fields` (`WITH CHECK (auth.uid() = id AND role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid()))`) and engine trigger `trg_prevent_role_escalation`. Admin users manage roles through policy `Admins can update any profile`. All non-admin users are barred from modifying the master questions catalogue.
 
 ### Step 6: Create the Initial Admin User
 To log in as the first administrator:
@@ -390,16 +399,20 @@ The project includes the following commands defined in `package.json`:
 │   └── test/                        # Automated test suites
 │       ├── setup.ts                 # Test environment setup (JSDOM polyfills)
 │       ├── authAndRls.test.tsx      # RLS policies and permission validation
+│       ├── profilesSecurity.test.ts # RLS role hardening and trigger test suite
+│       ├── securityHardening.test.tsx# Demo mode isolation & client-side role guards
 │       ├── interviewFlow.test.tsx   # Dashboard, form rendering & export workflows
 │       ├── interviewPersistence.test.tsx# Supabase persistence & fallback mechanisms
 │       ├── questionsData.test.ts    # Questionnaire logic & tier mapping tests
+│       ├── questionsService.test.ts # Database question fetching & fallback tests
 │       └── supabaseAuth.test.tsx    # Authentication state and login view tests
 │
 └── supabase/                        # Database schema, storage, and seed definitions
     ├── seed.sql                     # Full SQL seed for master questions catalogue
     └── migrations/
         ├── 20250916_initial_schema.sql  # Database schema, tables, triggers, and RLS
-        └── 20250916_storage_setup.sql   # Storage bucket setup & storage.objects RLS
+        ├── 20250916_storage_setup.sql   # Storage bucket setup & storage.objects RLS
+        └── 20260920_harden_profiles_role_update.sql # Hardened RLS policies & anti-escalation trigger
 ```
 
 ---
@@ -411,6 +424,19 @@ The project includes the following commands defined in `package.json`:
 | :--- | :--- | :--- |
 | **`interviewer`** | • Create and edit assigned interviews<br>• Complete questionnaire sections<br>• Update checklist and upload documents<br>• Export diagnostic briefs | • Interview Dashboard<br>• Diagnostic Interview Form<br>• Statutory Documents Inventory<br>• User Profile |
 | **`admin`** | • All `interviewer` capabilities<br>• View all interviews nationwide<br>• Delete interviews<br>• Access cross-departmental analytics<br>• Manage user accounts and assign roles | • All Interviewer views<br>• National Oversight Analytics<br>• User Administration View |
+
+### Profiles Privilege Escalation Defense Model
+To prevent unauthorized privilege escalation (`await supabase.from('profiles').update({ role: 'admin' }).eq('id', auth.uid())`):
+1. **Separation of Update Policies**:
+   - **`Users update own non-role fields`**: Permitted only when `auth.uid() = id`, with an enforced `WITH CHECK (auth.uid() = id AND role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid()))`. This allows users to update personal details (`full_name`, `phone_number`, `department_unit`, `avatar_url`) while rejecting any mutation of `role`.
+   - **`Admins can update any profile`**: Permitted only when `public.is_admin()` returns true (`USING (public.is_admin()) WITH CHECK (public.is_admin())`). This preserves the ability of Directorate Administrators to assign and change staff roles in `UserManagementView`.
+2. **Defensive Database Trigger (`trg_prevent_role_escalation`)**:
+   - Executes `BEFORE UPDATE ON public.profiles`.
+   - Checks `IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.is_admin() THEN RAISE EXCEPTION ... USING ERRCODE = '42501'`.
+   - Rejects any direct bypass attempts with standard PostgreSQL insufficient privilege errors.
+3. **Client-Side Defense-in-Depth**:
+   - `AuthContext.updateProfile` strips the `role` attribute before updating client state or emitting REST queries.
+   - `AuthContext.updateUserRole` requires `actualRole === 'admin'`.
 
 ### Role Switching Mechanics
 - **Demo Mode**: The user profile dropdown in the top header features a quick-switch control allowing instant testing between interviewer and admin personas without re-authenticating.

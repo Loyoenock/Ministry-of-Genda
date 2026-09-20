@@ -8,10 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { DemoModeBanner } from '../components/DemoModeBanner';
+import { setSupabaseConfiguredForTesting } from '../lib/supabase';
 
 describe('Security Hardening & Demo Mode Isolation', () => {
   beforeEach(() => {
     localStorage.clear();
+    setSupabaseConfiguredForTesting(false);
   });
 
   function SecurityTestRig({ onSwitch }: { onSwitch?: (role: any) => void }) {
@@ -89,5 +91,88 @@ describe('Security Hardening & Demo Mode Isolation', () => {
 
     expect(screen.getByTestId('actual-role').textContent).toBe('interviewer');
     expect(screen.getByTestId('user-role').textContent).toBe('interviewer');
+  });
+
+  it('prevents non-admin from escalating role via updateProfile', async () => {
+    function ProfileUpdateTestRig() {
+      const { user, updateProfile } = useAuth();
+      return (
+        <div>
+          <div data-testid="profile-name">{user?.full_name}</div>
+          <div data-testid="profile-role">{user?.role}</div>
+          <button
+            data-testid="malicious-update-btn"
+            onClick={() =>
+              updateProfile({
+                full_name: 'John Updated',
+                // Malicious payload attempting role escalation
+                ...({ role: 'admin' } as any),
+              })
+            }
+          >
+            Update Profile
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <ProfileUpdateTestRig />
+      </AuthProvider>
+    );
+
+    expect(screen.getByTestId('profile-role').textContent).toBe('interviewer');
+
+    await act(async () => {
+      screen.getByTestId('malicious-update-btn').click();
+    });
+
+    // Name should be updated
+    expect(screen.getByTestId('profile-name').textContent).toBe('John Updated');
+    // Role must remain interviewer
+    expect(screen.getByTestId('profile-role').textContent).toBe('interviewer');
+  });
+
+  it('allows admin to update user roles across the organization', async () => {
+    function AdminRoleManagementTestRig() {
+      const { demoLogin, updateUserRole, allUsers, isAdmin } = useAuth();
+      return (
+        <div>
+          <div data-testid="is-admin-status">{isAdmin ? 'true' : 'false'}</div>
+          <button data-testid="login-admin" onClick={() => demoLogin('admin')}>
+            Login Admin
+          </button>
+          <button
+            data-testid="promote-user"
+            onClick={() => updateUserRole('usr-john-okello-001', 'admin')}
+          >
+            Promote John
+          </button>
+          <div data-testid="john-role">
+            {allUsers.find((u) => u.id === 'usr-john-okello-001')?.role}
+          </div>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <AdminRoleManagementTestRig />
+      </AuthProvider>
+    );
+
+    // Login as Florence (admin)
+    await act(async () => {
+      screen.getByTestId('login-admin').click();
+    });
+    expect(screen.getByTestId('is-admin-status').textContent).toBe('true');
+
+    // Admin promotes John
+    await act(async () => {
+      screen.getByTestId('promote-user').click();
+    });
+
+    expect(screen.getByTestId('john-role').textContent).toBe('admin');
   });
 });

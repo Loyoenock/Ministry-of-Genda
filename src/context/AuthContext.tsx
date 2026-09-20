@@ -19,6 +19,7 @@ export interface AuthContextType {
   isDemoMode: boolean;
   isSupabaseConfigured: boolean;
   allUsers: UserProfile[];
+  authError: string | null;
   login: (email: string, password?: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string, department?: string) => Promise<{ error: any }>;
   logout: () => Promise<void>;
@@ -94,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    if (isTestEnv) return true;
+    if (isTestEnv && !isSupabaseConfigured) return true;
     if (isSupabaseConfigured) return false;
     return true;
   });
@@ -103,6 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isTestEnv) return false;
     return isSupabaseConfigured;
   });
+
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Log clear warning to console when running in demo mode
   useEffect(() => {
@@ -520,7 +523,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!currentUser) return;
 
-    const updatedUser = { ...currentUser, ...updates };
+    // Defense-in-depth: Ensure role cannot be altered via self profile updates
+    const safeUpdates = { ...updates };
+    delete (safeUpdates as any).role;
+
+    const updatedUser = { ...currentUser, ...safeUpdates, role: currentUser.role };
     setCurrentUser(updatedUser);
 
     if (isSupabaseConfigured && !isDemoMode) {
@@ -542,10 +549,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers((all) => all.map((u) => (u.id === currentUser.id ? updatedUser : u)));
   };
 
+  const triggerError = (message: string) => {
+    setAuthError(message);
+    setTimeout(() => setAuthError(null), 5000);
+  };
+
   /**
    * Administrative role update
    */
   const updateUserRole = async (userId: string, newRole: UserRole) => {
+    const prevUsers = users;
+    const prevCurrentUser = currentUser;
+    const prevActualRole = actualRole;
+    const prevActiveRole = activeRole;
+    
+    console.log('Before update, prevUsers:', prevUsers.map(u => u.role));
+
+    // Optimistic update
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
 
     if (currentUser && currentUser.id === userId) {
@@ -554,12 +574,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveRole(newRole);
     }
 
-    if (isSupabaseConfigured && !isDemoMode && actualRole === 'admin') {
+    if (isSupabaseConfigured && actualRole === 'admin') {
       try {
-        await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+        const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+        if (error) throw error;
       } catch (err) {
         console.error('Error updating user role in Supabase:', err);
+        
+        // Rollback immediately
+        setUsers(() => [...prevUsers]);
+        setCurrentUser(() => (prevCurrentUser ? { ...prevCurrentUser } : null));
+        setActualRole(() => prevActualRole);
+        setActiveRole(() => prevActiveRole);
+        
+        triggerError('Failed to update role – changes reverted');
       }
+    } else {
+        // Fallback for demo mode
     }
   };
 
@@ -597,6 +628,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfile,
         updateUserRole,
         addNewUser,
+        authError,
       }}
     >
       {children}
