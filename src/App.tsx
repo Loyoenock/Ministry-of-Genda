@@ -18,6 +18,7 @@ import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
+import { SupabaseConfigErrorView } from './components/SupabaseConfigErrorView';
 import { Interview } from './types';
 import { fetchQuestionsFromSupabase } from './lib/questionsService';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -200,28 +201,7 @@ function RootContent() {
 export default function App() {
   const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
   if (!isSupabaseConfigured && !isTestEnv) {
-    return (
-      <div className="min-h-screen bg-[#070d1f] text-slate-100 flex flex-col items-center justify-center p-6 selection:bg-teal-500 selection:text-white">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-white tracking-tight">Supabase Configuration Required</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              The MGLSD Labour Directorate Diagnostic Interview Application requires a live Supabase backend. Please configure <code className="text-teal-400 font-mono">VITE_SUPABASE_URL</code> and <code className="text-teal-400 font-mono">VITE_SUPABASE_ANON_KEY</code> in your environment or <code className="text-teal-400 font-mono">.env</code> file.
-            </p>
-          </div>
-          <div className="p-3 bg-slate-800/80 rounded-xl text-left text-[11px] text-slate-300 space-y-1 font-mono">
-            <p className="text-amber-300 font-bold"># .env example</p>
-            <p>VITE_SUPABASE_URL=https://your-project.supabase.co</p>
-            <p>VITE_SUPABASE_ANON_KEY=your-anon-key</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <SupabaseConfigErrorView />;
   }
 
   return (

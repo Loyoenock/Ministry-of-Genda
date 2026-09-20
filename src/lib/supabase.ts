@@ -10,20 +10,64 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
+const hasUrl = Boolean(rawUrl);
+const hasKey = Boolean(rawKey);
+const isUrlPlaceholder = rawUrl.includes('your-project') || rawUrl.toLowerCase().includes('placeholder');
+const isKeyPlaceholder = rawKey.includes('your-anon-key') || rawKey.toLowerCase().includes('placeholder');
+const hasValidProtocol = rawUrl.startsWith('https://') || rawUrl.startsWith('http://');
+
+let errorMessage: string | null = null;
+if (!hasUrl && !hasKey) {
+  errorMessage = 'Both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are missing from your environment variables.';
+} else if (!hasUrl) {
+  errorMessage = 'VITE_SUPABASE_URL is missing from your environment variables.';
+} else if (!hasKey) {
+  errorMessage = 'VITE_SUPABASE_ANON_KEY is missing from your environment variables.';
+} else if (isUrlPlaceholder || isKeyPlaceholder) {
+  errorMessage = 'Detected placeholder values in Supabase environment variables. Please replace them with your actual Supabase project URL and anon API key.';
+} else if (!hasValidProtocol) {
+  errorMessage = 'VITE_SUPABASE_URL must start with https:// or http://.';
+}
+
+export const isConfigured = Boolean(
+  hasUrl && hasKey && !isUrlPlaceholder && !isKeyPlaceholder && hasValidProtocol
+);
+
+export interface SupabaseConfigState {
+  isConfigured: boolean;
+  url: string | null;
+  errorMessage: string | null;
+  details?: {
+    hasUrl: boolean;
+    hasKey: boolean;
+    isUrlPlaceholder: boolean;
+    isKeyPlaceholder: boolean;
+    hasValidProtocol: boolean;
+  };
+}
+
+export const supabaseConfig: SupabaseConfigState = {
+  isConfigured,
+  url: hasUrl ? rawUrl : null,
+  errorMessage,
+  details: {
+    hasUrl,
+    hasKey,
+    isUrlPlaceholder,
+    isKeyPlaceholder,
+    hasValidProtocol,
+  },
+};
+
 /**
  * Flag indicating whether a real Supabase backend has been configured.
  * Must be a valid HTTP(S) URL and non-placeholder API key.
  */
-export let isSupabaseConfigured: boolean = Boolean(
-  rawUrl &&
-    rawKey &&
-    !rawUrl.includes('your-project') &&
-    !rawKey.includes('your-anon-key') &&
-    (rawUrl.startsWith('https://') || rawUrl.startsWith('http://'))
-);
+export let isSupabaseConfigured: boolean = isConfigured;
 
 export function setSupabaseConfiguredForTesting(val: boolean): void {
   isSupabaseConfigured = val;
+  (supabaseConfig as any).isConfigured = val;
 }
 
 /**
