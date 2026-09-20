@@ -35,6 +35,7 @@ export interface InterviewContextType {
   checklists: Record<string, DocumentItem[]>;
   notes: Record<string, InterviewerNote>;
   autoSaveStatus: 'saved' | 'saving' | 'error';
+  setAutoSaveStatus: (status: 'saved' | 'saving' | 'error') => void;
   loading: boolean;
   error: string | null;
   refreshInterviews: () => Promise<void>;
@@ -66,7 +67,7 @@ export interface InterviewContextType {
   ) => Promise<string | void> | void;
 }
 
-const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
+export const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
 
 export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAdmin } = useAuth();
@@ -190,6 +191,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         checklists: checklistState.checklistsMap,
         notes: notesState.notesMap,
         autoSaveStatus,
+        setAutoSaveStatus,
         loading: interviewRecords.loading,
         error: interviewRecords.error,
         refreshInterviews: interviewRecords.refreshInterviews,

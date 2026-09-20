@@ -585,9 +585,11 @@ export async function saveNotesToSupabase(
 
     if (error) {
       console.warn('Supabase save notes notice:', error.message);
+      throw new Error(`Failed to save notes: ${error.message}`);
     }
   } catch (err) {
     console.warn('Error saving notes to Supabase:', err);
+    throw err;
   }
 }
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { InterviewerNote } from '../types';
 import { useQuestions } from './useQuestions';
 import { useInterviews } from '../context/InterviewContext';
@@ -21,10 +21,11 @@ export function useInterviewFormState(interviewId: string) {
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
-    autoSaveStatus,
+    autoSaveStatus: contextAutoSaveStatus,
+    setAutoSaveStatus,
   } = useInterviews();
 
-  const { questions, getQuestionsForTier, getSectionsForTier, loading: questionsLoading } = useQuestions();
+  const { getQuestionsForTier, getSectionsForTier } = useQuestions();
 
   const interview = useMemo(() => {
     return interviews.find((i) => i.id === interviewId);
@@ -71,46 +72,155 @@ export function useInterviewFormState(interviewId: string) {
     [interviewId, saveAnswer]
   );
 
-  // Local notes state
+  // =========================================================================
+  // Hardened Notes Auto-Save & State Management
+  // =========================================================================
   const [localNotes, setLocalNotes] = useState<InterviewerNote>(notes);
+  const lastSavedNotesRef = useRef<InterviewerNote>(notes);
+  const pendingUpdatesRef = useRef<Partial<InterviewerNote>>({});
+  const saveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [localAutoSaveStatus, setLocalAutoSaveStatus] = useState<
+    'saved' | 'saving' | 'error' | null
+  >(null);
+
+  // Sync state when switching interviews or when fresh external notes are loaded
   useEffect(() => {
-    setLocalNotes(notes);
+    if (Object.keys(pendingUpdatesRef.current).length === 0) {
+      setLocalNotes(notes);
+      lastSavedNotesRef.current = notes;
+    }
   }, [notes]);
+
+  // Handle switching interviewId
+  useEffect(() => {
+    if (saveDebounceTimerRef.current) {
+      clearTimeout(saveDebounceTimerRef.current);
+      saveDebounceTimerRef.current = null;
+    }
+    pendingUpdatesRef.current = {};
+    setLocalNotes(notes);
+    lastSavedNotesRef.current = notes;
+  }, [interviewId]);
+
+  // Flushes pending notes updates immediately with error rollback
+  const flushNotesSave = useCallback(async () => {
+    if (saveDebounceTimerRef.current) {
+      clearTimeout(saveDebounceTimerRef.current);
+      saveDebounceTimerRef.current = null;
+    }
+
+    const updatesToSave = { ...pendingUpdatesRef.current };
+    if (Object.keys(updatesToSave).length === 0) {
+      return;
+    }
+
+    pendingUpdatesRef.current = {};
+
+    try {
+      setAutoSaveStatus?.('saving');
+      setLocalAutoSaveStatus('saving');
+
+      await saveNotes(interviewId, updatesToSave);
+
+      // On successful save: update last saved baseline
+      lastSavedNotesRef.current = {
+        ...lastSavedNotesRef.current,
+        ...updatesToSave,
+      };
+      setAutoSaveStatus?.('saved');
+      setLocalAutoSaveStatus('saved');
+    } catch (err) {
+      console.error('Failed to auto-save notes:', err);
+      // On error: roll the local state back to the last successfully saved version
+      setLocalNotes(lastSavedNotesRef.current);
+      pendingUpdatesRef.current = {};
+      setAutoSaveStatus?.('error');
+      setLocalAutoSaveStatus('error');
+    }
+  }, [interviewId, saveNotes, setAutoSaveStatus]);
+
+  // Debounces note updates by 700ms (within 600–800ms)
+  const scheduleNotesSave = useCallback(
+    (newUpdates: Partial<InterviewerNote>) => {
+      pendingUpdatesRef.current = {
+        ...pendingUpdatesRef.current,
+        ...newUpdates,
+      };
+
+      if (saveDebounceTimerRef.current) {
+        clearTimeout(saveDebounceTimerRef.current);
+      }
+
+      setAutoSaveStatus?.('saving');
+      setLocalAutoSaveStatus('saving');
+
+      saveDebounceTimerRef.current = setTimeout(() => {
+        flushNotesSave();
+      }, 700);
+    },
+    [flushNotesSave, setAutoSaveStatus]
+  );
+
+  // Cancel / flush debounced updates on unmount or navigation
+  useEffect(() => {
+    return () => {
+      if (saveDebounceTimerRef.current) {
+        clearTimeout(saveDebounceTimerRef.current);
+        saveDebounceTimerRef.current = null;
+      }
+      const pending = { ...pendingUpdatesRef.current };
+      if (Object.keys(pending).length > 0) {
+        pendingUpdatesRef.current = {};
+        saveNotes(interviewId, pending).catch((err) => {
+          console.warn('Notice: Failed flushing notes on unmount:', err);
+        });
+      }
+    };
+  }, [interviewId, saveNotes]);
 
   const handleNoteFieldChange = useCallback(
     (field: keyof InterviewerNote, value: any) => {
-      const updated = { ...localNotes, [field]: value };
-      setLocalNotes(updated);
-      saveNotes(interviewId, { [field]: value });
+      setLocalNotes((prev) => ({ ...prev, [field]: value }));
+      scheduleNotesSave({ [field]: value });
     },
-    [interviewId, localNotes, saveNotes]
+    [scheduleNotesSave]
   );
 
   const handleNumbersCapturedChange = useCallback(
     (metricKey: string, val: any) => {
+      setLocalNotes((prev) => {
+        const updatedNumbers = {
+          ...(prev.numbers_captured || {}),
+          [metricKey]: val,
+        };
+        return { ...prev, numbers_captured: updatedNumbers };
+      });
       const updatedNumbers = {
-        ...localNotes.numbers_captured,
+        ...(localNotes.numbers_captured || {}),
         [metricKey]: val,
       };
-      const updated = { ...localNotes, numbers_captured: updatedNumbers };
-      setLocalNotes(updated);
-      saveNotes(interviewId, { numbers_captured: updatedNumbers });
+      scheduleNotesSave({ numbers_captured: updatedNumbers });
     },
-    [interviewId, localNotes, saveNotes]
+    [localNotes.numbers_captured, scheduleNotesSave]
   );
 
   const handleMaturityScoreChange = useCallback(
     (domain: string, score: number) => {
+      setLocalNotes((prev) => {
+        const updatedMaturity = {
+          ...(prev.maturity_signals || {}),
+          [domain]: score,
+        };
+        return { ...prev, maturity_signals: updatedMaturity };
+      });
       const updatedMaturity = {
-        ...localNotes.maturity_signals,
+        ...(localNotes.maturity_signals || {}),
         [domain]: score,
       };
-      const updated = { ...localNotes, maturity_signals: updatedMaturity };
-      setLocalNotes(updated);
-      saveNotes(interviewId, { maturity_signals: updatedMaturity });
+      scheduleNotesSave({ maturity_signals: updatedMaturity });
     },
-    [interviewId, localNotes, saveNotes]
+    [localNotes.maturity_signals, scheduleNotesSave]
   );
 
   // Metrics
@@ -121,6 +231,8 @@ export function useInterviewFormState(interviewId: string) {
   const collectedDocsCount = useMemo(() => {
     return countCollectedDocuments(checklist);
   }, [checklist]);
+
+  const effectiveAutoSaveStatus = localAutoSaveStatus ?? contextAutoSaveStatus;
 
   return {
     interview,
@@ -135,6 +247,7 @@ export function useInterviewFormState(interviewId: string) {
     handleNoteFieldChange,
     handleNumbersCapturedChange,
     handleMaturityScoreChange,
+    flushNotesSave,
     answeredCount,
     overallPercentage,
     collectedDocsCount,
@@ -142,6 +255,6 @@ export function useInterviewFormState(interviewId: string) {
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
-    autoSaveStatus,
+    autoSaveStatus: effectiveAutoSaveStatus,
   };
 }

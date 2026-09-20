@@ -60,6 +60,15 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
 
   const saveNotesTimer = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (saveNotesTimer.current) {
+        clearTimeout(saveNotesTimer.current);
+        saveNotesTimer.current = null;
+      }
+    };
+  }, []);
+
   // Sync to localStorage
   useEffect(() => {
     try {
@@ -123,14 +132,14 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
   }, []);
 
   const saveNotes = useCallback(
-    (interviewId: string, updates: Partial<InterviewerNote>) => {
+    async (interviewId: string, updates: Partial<InterviewerNote>): Promise<void> => {
       setAutoSaveStatus('saving');
 
-      let updatedNote: InterviewerNote;
+      let previousNote: InterviewerNote | undefined;
       setNotesMap((prev) => {
-        const current = prev[interviewId] || createInitialNotes(interviewId);
-        updatedNote = {
-          ...current,
+        previousNote = prev[interviewId] || createInitialNotes(interviewId);
+        const updatedNote: InterviewerNote = {
+          ...previousNote,
           ...updates,
           updated_at: new Date().toISOString(),
         };
@@ -142,20 +151,26 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
 
       if (saveNotesTimer.current) {
         clearTimeout(saveNotesTimer.current);
+        saveNotesTimer.current = null;
       }
 
-      saveNotesTimer.current = setTimeout(async () => {
-        if (isSupabaseConfigured && isUuid(interviewId)) {
-          try {
-            await saveNotesToSupabase(interviewId, updates);
-            setAutoSaveStatus('saved');
-          } catch {
-            setAutoSaveStatus('error');
-          }
-        } else {
+      if (isSupabaseConfigured && isUuid(interviewId)) {
+        try {
+          await saveNotesToSupabase(interviewId, updates);
           setAutoSaveStatus('saved');
+        } catch (err) {
+          if (previousNote) {
+            setNotesMap((prev) => ({
+              ...prev,
+              [interviewId]: previousNote!,
+            }));
+          }
+          setAutoSaveStatus('error');
+          throw err;
         }
-      }, 450);
+      } else {
+        setAutoSaveStatus('saved');
+      }
     },
     [setAutoSaveStatus]
   );
