@@ -55,7 +55,7 @@ export const SupabaseConfigErrorView: React.FC = () => {
                 <span>VITE_SUPABASE_URL provided</span>
               </span>
               <span className={details?.hasUrl ? 'text-emerald-400' : 'text-rose-400'}>
-                {details?.hasUrl ? 'Present' : 'Missing'}
+                {details?.hasUrl ? (supabaseConfig.maskedUrl || 'Present') : 'Missing'}
               </span>
             </div>
 
@@ -65,7 +65,7 @@ export const SupabaseConfigErrorView: React.FC = () => {
                 <span>VITE_SUPABASE_ANON_KEY provided</span>
               </span>
               <span className={details?.hasKey ? 'text-emerald-400' : 'text-rose-400'}>
-                {details?.hasKey ? 'Present' : 'Missing'}
+                {details?.hasKey ? (supabaseConfig.maskedKey || 'Present') : 'Missing'}
               </span>
             </div>
 
@@ -88,6 +88,17 @@ export const SupabaseConfigErrorView: React.FC = () => {
                 {details?.hasValidProtocol ? 'Valid' : 'Invalid'}
               </span>
             </div>
+          </div>
+
+          {/* Troubleshooting checklist */}
+          <div className="p-4 bg-amber-500/5 rounded-2xl border border-amber-500/20 text-slate-300 space-y-1.5 text-[11px]">
+            <p className="font-bold text-amber-400">Troubleshooting Checklist:</p>
+            <ul className="list-disc list-inside space-y-1 text-slate-300">
+              <li>Confirm <code className="text-teal-300">.env</code> is located in the project root (same directory as <code className="text-teal-300">package.json</code>).</li>
+              <li>Restart your dev server completely (<code className="text-teal-300">npm run dev</code>) after changing <code className="text-teal-300">.env</code>.</li>
+              <li>Ensure variable names start with <code className="text-teal-300">VITE_</code>.</li>
+              <li>Remove any accidental wrapping quotes around the URL or key values in <code className="text-teal-300">.env</code>.</li>
+            </ul>
           </div>
         </div>
 

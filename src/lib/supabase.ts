@@ -6,9 +6,14 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+// Environment variables with quote stripping and whitespace trimming
+const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/^["']|["']$/g, '').trim();
+const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').replace(/^["']|["']$/g, '').trim();
+
+if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'development')) {
+  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_URL:', rawUrl ? `${rawUrl.substring(0, 25)}...` : 'MISSING');
+  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_ANON_KEY:', rawKey ? `${rawKey.substring(0, 12)}... (length: ${rawKey.length})` : 'MISSING');
+}
 
 const hasUrl = Boolean(rawUrl);
 const hasKey = Boolean(rawKey);
@@ -37,6 +42,8 @@ export interface SupabaseConfigState {
   isConfigured: boolean;
   url: string | null;
   errorMessage: string | null;
+  maskedUrl?: string | null;
+  maskedKey?: string | null;
   details?: {
     hasUrl: boolean;
     hasKey: boolean;
@@ -46,10 +53,15 @@ export interface SupabaseConfigState {
   };
 }
 
+const maskedUrlVal = hasUrl ? (rawUrl.length > 30 ? `${rawUrl.substring(0, 24)}...` : rawUrl) : null;
+const maskedKeyVal = hasKey ? `${rawKey.substring(0, 12)}...${rawKey.substring(rawKey.length - 6)}` : null;
+
 export const supabaseConfig: SupabaseConfigState = {
   isConfigured,
   url: hasUrl ? rawUrl : null,
   errorMessage,
+  maskedUrl: maskedUrlVal,
+  maskedKey: maskedKeyVal,
   details: {
     hasUrl,
     hasKey,
