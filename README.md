@@ -252,6 +252,27 @@ The app will connect to your live Supabase database. You can sign in using real 
 
 ---
 
+### 6. Vercel Deployment & Environment Variables
+
+When deploying the application to **Vercel** or other static hosting providers running Vite, you must configure your Supabase credentials in the Vercel project settings.
+
+#### Why the `VITE_` Prefix is Required
+Vite strictly requires client-side environment variables to be prefixed with `VITE_` (e.g., `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`) so they can be securely bundled into the client-side JavaScript (`import.meta.env`).
+
+#### Handling the Vercel Dashboard Warning
+When you add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel dashboard, Vercel will display a warning:
+> *“Remove the public framework prefix to keep this value private. Public prefixes expose values to the browser. If that’s safe, change the variable to Config.”*
+
+**Security Reality & Best Practices:**
+1. **`VITE_SUPABASE_URL`**: Just your public project URL. Exposing this is completely safe.
+2. **`VITE_SUPABASE_ANON_KEY`**: Designed by Supabase to be public. It is not a secret key; all database access via this key is strictly protected and governed by PostgreSQL **Row-Level Security (RLS)** policies.
+3. **Action in Vercel**: Keep the variable names exactly as **`VITE_SUPABASE_URL`** and **`VITE_SUPABASE_ANON_KEY`**. When Vercel warns you about the public prefix, **acknowledge and accept the warning** (or choose the option confirming that public exposure is intentional and safe). Do *not* remove the `VITE_` prefix, or the application will fail to detect your Supabase backend and will display the configuration error screen.
+
+> [!CAUTION]
+> **Never** expose the Supabase `service_role` key in any `VITE_` variable or client-side bundle. Service role keys bypass RLS and must remain private server-side secrets.
+
+---
+
 ## 5. Supabase Backend Setup
 
 Follow these steps to configure a brand-new Supabase project for the application.

@@ -6,22 +6,38 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables with quote stripping and whitespace trimming (supporting SUPABASE_URL and SUPABASE_ANON_KEY, with VITE_ fallback)
+// Environment variables with quote stripping and whitespace trimming (prioritizing VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for Vite client injection, with fallback)
 const rawUrl = (
-  import.meta.env.SUPABASE_URL ||
   import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.SUPABASE_URL ||
   ''
 ).replace(/^["']|["']$/g, '').trim();
 
 const rawKey = (
-  import.meta.env.SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.SUPABASE_ANON_KEY ||
   ''
 ).replace(/^["']|["']$/g, '').trim();
 
+// Security assertion: Ensure service_role key is never exposed to the client
+if (rawKey.includes('service_role') || (rawKey.length > 200 && rawKey.includes('eyJ'))) {
+  // Check if it's likely a service role key by inspecting base64 payload if possible or keyword
+  try {
+    const parts = rawKey.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload.role === 'service_role') {
+        console.error('[SECURITY CRITICAL] You have provided a Supabase SERVICE_ROLE key instead of an ANON key! Service role keys bypass RLS and must NEVER be exposed to the browser via VITE_SUPABASE_ANON_KEY.');
+      }
+    }
+  } catch (e) {
+    // ignore parse error
+  }
+}
+
 if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'development')) {
-  console.log('[Supabase Config Diagnostics] SUPABASE_URL:', rawUrl ? `${rawUrl.substring(0, 25)}...` : 'MISSING');
-  console.log('[Supabase Config Diagnostics] SUPABASE_ANON_KEY:', rawKey ? `${rawKey.substring(0, 12)}... (length: ${rawKey.length})` : 'MISSING');
+  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_URL:', rawUrl ? `${rawUrl.substring(0, 25)}...` : 'MISSING');
+  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_ANON_KEY:', rawKey ? `${rawKey.substring(0, 12)}... (length: ${rawKey.length})` : 'MISSING');
 }
 
 const hasUrl = Boolean(rawUrl);
