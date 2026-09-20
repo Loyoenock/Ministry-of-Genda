@@ -105,14 +105,6 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
       return;
     }
 
-    if (newStatus === 'Completed' && overallPercentage < 100) {
-      showToast(
-        'warning',
-        `Cannot mark as Completed until all diagnostic questions are answered (currently at ${overallPercentage}%).`
-      );
-      return;
-    }
-
     if (newStatus === interview.status) return;
 
     try {
@@ -121,7 +113,14 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
         ...(newStatus === 'Completed' ? { completion_percentage: 100 } : {}),
       };
       await updateInterview(interview.id, updates);
-      showToast('success', `Status successfully updated to ${newStatus}`);
+      if (newStatus === 'Completed' && overallPercentage < 100) {
+        showToast(
+          'warning',
+          `Status updated to Completed (forced final completion from ${overallPercentage}%).`
+        );
+      } else {
+        showToast('success', `Status successfully updated to ${newStatus}`);
+      }
     } catch (err: any) {
       showToast('error', `Failed to update status: ${err?.message || 'Error occurred'}`);
     }
@@ -165,7 +164,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     );
   }
 
-  const isCompletedOptionDisabled = !canModify || overallPercentage < 100;
+  const isCompletedOptionDisabled = !canModify;
 
   return (
     <div className="space-y-6 pb-20">
@@ -192,7 +191,11 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                 <AlertTriangle className="w-6 h-6 text-rose-600" />
               </div>
               <div className="space-y-1">
-                <h3 id="delete-interview-title" className="text-base font-bold text-slate-900">
+                <h3
+                  id="delete-interview-title"
+                  data-testid="confirm-delete-title"
+                  className="text-base font-bold text-slate-900"
+                >
                   Permanently delete this interview?
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -333,15 +336,13 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
                     className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                       interview.status === 'Completed'
                         ? 'bg-emerald-600 text-white shadow-xs'
-                        : overallPercentage < 100
+                        : !canModify
                         ? 'text-slate-400 opacity-60 cursor-not-allowed'
                         : 'text-slate-500 hover:text-emerald-700 cursor-pointer'
                     }`}
                     title={
                       !canModify
                         ? 'Only assigned interviewer or admin can modify status'
-                        : overallPercentage < 100
-                        ? `Complete all diagnostic questions before marking as Completed (currently at ${overallPercentage}%)`
                         : 'Mark interview as Completed'
                     }
                   >
@@ -351,6 +352,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
 
                 {!canModify && (
                   <span
+                    data-testid="readonly-badge"
                     className="inline-flex items-center space-x-1 text-[11px] text-slate-400 font-medium ml-1"
                     title="Only the assigned interviewer or an administrator can modify status or delete"
                   >
@@ -439,6 +441,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           <div
             role="status"
             aria-live="polite"
+            data-testid="status-toast"
             className={`mt-3 flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold border shadow-2xs transition-all ${
               statusToast.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
