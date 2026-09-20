@@ -318,6 +318,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchOrCreateProfile, isTestEnv]);
 
+  // Realtime subscription for profile changes (role updates across tabs/browsers)
+  useEffect(() => {
+    if (!isSupabaseConfigured || isTestEnv || !currentUser) return;
+
+    const channel = supabase
+      .channel(`profile-role-changes-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const newRecord = payload.new as any;
+          if (newRecord && newRecord.role) {
+            const mappedRole = (newRecord.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
+            setCurrentUser((prev) => (prev ? { ...prev, role: mappedRole } : null));
+            setActualRole(mappedRole);
+            setActiveRole(mappedRole);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSupabaseConfigured, isTestEnv, currentUser?.id]);
+
   /**
    * Real Supabase Sign In (or local fallback in demo mode)
    */

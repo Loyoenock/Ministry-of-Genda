@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
-  const { login, signUp, demoLogin, isSupabaseConfigured } = useAuth();
+  const { login, signUp } = useAuth();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -48,7 +48,7 @@ export const LoginView: React.FC = () => {
       return;
     }
 
-    if (isSupabaseConfigured && !password.trim()) {
+    if (!password.trim()) {
       setErrorMessage('Please enter your account password.');
       return;
     }
@@ -113,17 +113,8 @@ export const LoginView: React.FC = () => {
 
         {/* Backend Connection Status Badge */}
         <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full border text-xs font-semibold bg-slate-900/60 backdrop-blur-xs">
-          {isSupabaseConfigured ? (
-            <>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-300">Supabase Connected</span>
-            </>
-          ) : (
-            <>
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="text-amber-300">Demo Prototype Mode</span>
-            </>
-          )}
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-emerald-300">Supabase Connected</span>
         </div>
       </header>
 
@@ -276,9 +267,6 @@ export const LoginView: React.FC = () => {
                   <label htmlFor="login-password" className="block text-xs font-bold text-slate-700">
                     Password
                   </label>
-                  {!isSupabaseConfigured && (
-                    <span className="text-[10px] text-slate-400">Optional in demo mode</span>
-                  )}
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -286,8 +274,8 @@ export const LoginView: React.FC = () => {
                     id="login-password"
                     data-testid="login-password"
                     type={showPassword ? 'text' : 'password'}
-                    required={isSupabaseConfigured}
-                    placeholder={isSupabaseConfigured ? '••••••••' : 'Enter password or leave blank'}
+                    required
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-600 focus:border-transparent outline-none min-h-[42px] transition bg-slate-50 focus:bg-white"
@@ -319,57 +307,6 @@ export const LoginView: React.FC = () => {
                 )}
               </button>
             </form>
-
-            {/* Quick Demo Access Section (Pure demo mode or test env) */}
-            {(!isSupabaseConfigured || (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test')) && (
-              <div className="pt-5 border-t border-slate-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Quick Demo Access
-                  </span>
-                  <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-semibold">
-                    Instant Test Personas
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    id="login-demo-interviewer-btn"
-                    data-testid="login-demo-interviewer-btn"
-                    onClick={() => demoLogin('interviewer')}
-                    className="p-3 text-left border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
-                  >
-                    <UserCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 leading-tight">John Okello</p>
-                      <p className="text-[11px] text-slate-500">Interviewer Role (RLS)</p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="login-demo-admin-btn"
-                    data-testid="login-demo-admin-btn"
-                    onClick={() => demoLogin('admin')}
-                    className="p-3 text-left border border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 rounded-xl transition group flex items-start space-x-2.5 min-h-[58px]"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5 group-hover:scale-110 transition" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 leading-tight">Florence Nsubuga</p>
-                      <p className="text-[11px] text-slate-500">Directorate Admin</p>
-                    </div>
-                  </button>
-                </div>
-
-                <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] text-amber-800 flex items-start space-x-2">
-                  <Database className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">
-                    <strong>Local Prototype Mode:</strong> Supabase environment variables (<code className="bg-amber-100 px-1 rounded">VITE_SUPABASE_URL</code>) are not set. You can test all features with mock users above, or configure credentials in <code className="bg-amber-100 px-1 rounded">.env</code>.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Statutory Security Disclaimer */}

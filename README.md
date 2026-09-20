@@ -337,6 +337,7 @@ When running in live Supabase mode (`isSupabaseConfigured === true`), new field 
 1. **Create User in Supabase Auth**: In the Supabase Dashboard, go to **Authentication -> Users** and invite or create the user.
 2. **Profile & Role Assignment**: Once the user signs up or is created, their corresponding row in `public.profiles` is populated, and administrators can assign or update their role (`interviewer` or `admin`) directly from the **User Management** view within the application.
 3. **UI Graceful Degradation**: In live Supabase mode, the local "Add New Field Interviewer" button is disabled with an explanatory banner, ensuring that unauthenticated or unmanaged mock IDs are not incorrectly inserted into production databases.
+4. **Role & Privilege Propagation**: The application utilizes Supabase Realtime channels (`profile-role-changes`) to instantly propagate role changes to active user sessions across tabs and browsers without requiring a manual page refresh or re-login.
 
 ---
 
