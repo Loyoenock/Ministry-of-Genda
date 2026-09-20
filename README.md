@@ -332,6 +332,12 @@ ON CONFLICT (id) DO UPDATE SET
 ```
 Now you can log in to the application with this email and password, receiving full administrator privileges.
 
+### Step 7: Production User Provisioning & Management
+When running in live Supabase mode (`isSupabaseConfigured === true`), new field interviewers and staff accounts must be provisioned securely via the Supabase Auth Dashboard or invite links:
+1. **Create User in Supabase Auth**: In the Supabase Dashboard, go to **Authentication -> Users** and invite or create the user.
+2. **Profile & Role Assignment**: Once the user signs up or is created, their corresponding row in `public.profiles` is populated, and administrators can assign or update their role (`interviewer` or `admin`) directly from the **User Management** view within the application.
+3. **UI Graceful Degradation**: In live Supabase mode, the local "Add New Field Interviewer" button is disabled with an explanatory banner, ensuring that unauthenticated or unmanaged mock IDs are not incorrectly inserted into production databases.
+
 ---
 
 ## 6. Available Scripts

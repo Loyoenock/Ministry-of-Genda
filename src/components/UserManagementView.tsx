@@ -9,7 +9,7 @@ import { UserRole, UserProfile } from '../types';
 import { Users, Shield, UserCheck, Plus, Check, Search, Building } from 'lucide-react';
 
 export const UserManagementView: React.FC = () => {
-  const { allUsers, updateUserRole, addNewUser, role } = useAuth();
+  const { allUsers, updateUserRole, addNewUser, role, isSupabaseConfigured } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -29,7 +29,7 @@ export const UserManagementView: React.FC = () => {
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail || !newName) return;
+    if (!newEmail || !newName || isSupabaseConfigured) return;
     addNewUser({
       email: newEmail,
       full_name: newName,
@@ -60,13 +60,26 @@ export const UserManagementView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="w-full sm:w-auto px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs min-h-[42px]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Field Interviewer</span>
-        </button>
+        <div className="flex flex-col sm:items-end gap-2">
+          <button
+            onClick={() => setShowAddModal(true)}
+            disabled={isSupabaseConfigured}
+            title={isSupabaseConfigured ? "New users must be created via the Supabase Dashboard or an invite link." : "Add a new field interviewer"}
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs min-h-[42px] ${
+              isSupabaseConfigured
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : 'bg-teal-700 hover:bg-teal-800 text-white'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Field Interviewer</span>
+          </button>
+          {isSupabaseConfigured && (
+            <p className="text-[11px] text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 max-w-md text-right">
+              New users must be created via the Supabase Dashboard or an invite link. Role can be assigned after the user signs up.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Search and filter */}

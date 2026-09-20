@@ -6,7 +6,7 @@ import { supabase, setSupabaseConfiguredForTesting } from '../lib/supabase';
 
 // Mock supabase
 vi.mock('../lib/supabase', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as Record<string, any>;
   return {
     ...actual,
     supabase: {
