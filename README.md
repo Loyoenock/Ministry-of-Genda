@@ -87,12 +87,70 @@ Triggered when `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` are missing, empt
 | `mglsd_notes` | `Record<string, InterviewerNote>` | Observation notes mapped by `interview_id` |
 | `mglsd_activities` | `RecentActivityItem[]` | System audit log of created/updated interviews |
 | `mglsd_questions_cache` | `Question[]` | Cached master questions catalogue loaded from Supabase |
+| `mglsd_questions_cache_meta` | `QuestionsCacheMetadata` | Cache timestamp, provenance source (`supabase` vs `fallback`), and row count |
 
 ### Dynamic Questions Loading & Single Source of Truth
-The canonical source of truth for the master diagnostic questions catalogue is the PostgreSQL database (`public.questions` table seeded by `supabase/seed.sql`).
-- **Runtime Loading**: In Supabase mode, questions are loaded at runtime via `fetchQuestionsFromSupabase()` in `src/lib/questionsService.ts` and cached in memory and `localStorage`.
-- **Zero-Drift**: Adding or modifying questions is done centrally in `supabase/seed.sql` rather than hardcoding in frontend files.
-- **Offline & Demo Fallback**: When `isSupabaseConfigured` is false or during offline field operation, the service falls back gracefully to cached questions or the verified demo catalogue in `src/lib/questionsData.ts`. Tier filtering (`getQuestionsForTier`) and section navigation (`getSectionsForTier`) remain 100% operational across all tiers.
+
+To prevent schema and catalogue drift, **Supabase (`public.questions` table)** is established as the canonical, single source of truth for the TRANSFORMATIVE diagnostic questionnaire. `src/lib/questionsData.ts` serves strictly as an offline safety net and demo fallback.
+
+```
+                  ┌────────────────────────────────────────────────────────┐
+                  │                 Application Boot / Hook                 │
+                  │   App.tsx (mount)  •  useQuestions() (initialization)  │
+                  └───────────────────────────┬────────────────────────────┘
+                                              │
+                                              ▼
+                             ┌─────────────────────────────────┐
+                             │    fetchQuestionsFromSupabase   │
+                             └────────────────┬────────────────┘
+                                              │
+                     ┌────────────────────────┴────────────────────────┐
+                     ▼                                                 ▼
+        [ isSupabaseConfigured = TRUE ]                 [ isSupabaseConfigured = FALSE ]
+                     │                                                 │
+                     ▼                                                 │
+        Query public.questions table                                   │
+                     │                                                 │
+        ┌────────────┴────────────┐                                    │
+        ▼                         ▼                                    │
+  [ Rows Found ]          [ Error / 0 Rows ]                           │
+        │                         │                                    │
+        ├─────────────────────────┼────────────────────────────────────┘
+        │                         │
+        ▼                         ▼
+┌───────────────────────┐  ┌───────────────────────────────────────────┐
+│ Supabase Live Mode    │  │ Fallback Safety Net                       │
+│ 1. Map to Question[]  │  │ 1. Inspect localStorage key                │
+│ 2. Save in memory     │  │    `mglsd_questions_cache`                 │
+│ 3. Save to storage    │  │ 2. If valid & unexpired, use cached pool   │
+│ 4. Set 24h timestamp  │  │ 3. If missing/empty, fall back to          │
+│    `mglsd_questions_  │  │    MASTER_QUESTIONS in questionsData.ts    │
+│    cache_meta`        │  └───────────────────────────────────────────┘
+└───────────────────────┘
+```
+
+#### Key Architecture Principles:
+1. **Canonical Single Source of Truth (`public.questions`)**:
+   - Master questions are defined and seeded in `supabase/seed.sql` with explicit `sort_order`, `applicable_tiers`, `section_code`, and `who_to_ask` fields.
+   - Any modifications, re-orderings, or new statutory questions are updated in the database directly. No code rebuild or redeployment is required.
+
+2. **In-Memory & Persistent Caching (`mglsd_questions_cache`)**:
+   - On app start (or first invocation of `useQuestions`), the application queries `public.questions`.
+   - Successful queries update the in-memory array and write to `localStorage` under `mglsd_questions_cache`.
+   - Metadata is stored under `mglsd_questions_cache_meta` containing `{ timestamp, count, source: 'supabase', isStale: boolean }`.
+
+3. **24-Hour Cache Refresh & Auto-Sync**:
+   - The cache incorporates a 24-hour TTL (`QUESTIONS_CACHE_TTL_MS = 86,400,000 ms`).
+   - If `isQuestionsCacheStale()` returns true, `useQuestions()` triggers a fresh background synchronization with Supabase.
+
+4. **Operator / Admin On-Demand Refresh**:
+   - Authorized administrators (`role: 'admin'`) can force an immediate catalogue sync without waiting for the 24-hour cycle:
+     - **Analytics Dashboard**: The "Refresh Questions Cache" button in the top action bar synchronizes immediately and displays status toasts with row counts.
+     - **Header User Dropdown**: The "Refresh Questions Cache" menu item allows instant synchronization from any screen.
+
+5. **Robust Offline Safety Net (`src/lib/questionsData.ts`)**:
+   - `MASTER_QUESTIONS` in `src/lib/questionsData.ts` is preserved strictly as the offline and demo fallback.
+   - If Supabase credentials are not provided (`isSupabaseConfigured === false`), or if network connection is lost or the database returns zero rows, the application falls back seamlessly without breaking tier filters or questionnaire forms.
 
 ### 2. Real Supabase Mode
 Triggered when valid `VITE_SUPABASE_URL` (starting with `https://`) and `VITE_SUPABASE_ANON_KEY` are supplied in `.env`.

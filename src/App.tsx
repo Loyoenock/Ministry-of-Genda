@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InterviewProvider, useInterviews } from './context/InterviewContext';
 import { Header } from './components/Header';
@@ -20,6 +20,7 @@ import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
 import { DemoModeBanner } from './components/DemoModeBanner';
 import { Interview } from './types';
+import { fetchQuestionsFromSupabase } from './lib/questionsService';
 
 function MainLayout() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -27,6 +28,13 @@ function MainLayout() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [exportInterviewId, setExportInterviewId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // On app start, attempt fetchQuestionsFromSupabase to warm in-memory & local cache
+  useEffect(() => {
+    fetchQuestionsFromSupabase().catch((err) => {
+      console.warn('App start questions sync notice:', err);
+    });
+  }, []);
 
   const { role, isAdmin } = useAuth();
 

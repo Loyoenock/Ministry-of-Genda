@@ -5,7 +5,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Bell, ChevronDown, ShieldCheck, UserCheck, LogOut, Sparkles, CheckCircle2, Menu, X } from 'lucide-react';
+import { Bell, ChevronDown, ShieldCheck, UserCheck, LogOut, Sparkles, CheckCircle2, Menu, X, RefreshCw } from 'lucide-react';
+import { refreshQuestionsCache } from '../lib/questionsService';
 
 interface HeaderProps {
   onNavigate: (view: string) => void;
@@ -254,17 +255,33 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>My Profile & Credentials</span>
                   </button>
                   {role === 'admin' && (
-                    <button
-                      data-testid="header-user-management-btn"
-                      onClick={() => {
-                        onNavigate('admin-users');
-                        setDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-purple-700 font-medium flex items-center justify-between min-h-[40px]"
-                    >
-                      <span>User Management</span>
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                    </button>
+                    <>
+                      <button
+                        data-testid="header-user-management-btn"
+                        onClick={() => {
+                          onNavigate('admin-users');
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-purple-700 font-medium flex items-center justify-between min-h-[40px]"
+                      >
+                        <span>User Management</span>
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        data-testid="header-refresh-questions-btn"
+                        onClick={async () => {
+                          await refreshQuestionsCache();
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between min-h-[40px]"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                          <span>Refresh Questions Cache</span>
+                        </div>
+                        <span className="text-[10px] bg-purple-50 text-purple-700 font-semibold px-1.5 py-0.5 rounded border border-purple-100">Sync</span>
+                      </button>
+                    </>
                   )}
                 </div>
 

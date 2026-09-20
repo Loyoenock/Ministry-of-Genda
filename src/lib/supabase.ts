@@ -14,13 +14,17 @@ const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
  * Flag indicating whether a real Supabase backend has been configured.
  * Must be a valid HTTP(S) URL and non-placeholder API key.
  */
-export const isSupabaseConfigured: boolean = Boolean(
+export let isSupabaseConfigured: boolean = Boolean(
   rawUrl &&
     rawKey &&
     !rawUrl.includes('your-project') &&
     !rawKey.includes('your-anon-key') &&
     (rawUrl.startsWith('https://') || rawUrl.startsWith('http://'))
 );
+
+export function setSupabaseConfiguredForTesting(val: boolean): void {
+  isSupabaseConfigured = val;
+}
 
 /**
  * Full Database schema types matching supabase/migrations/20250916_initial_schema.sql

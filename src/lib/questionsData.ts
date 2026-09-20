@@ -1,6 +1,20 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * ARCHITECTURAL NOTICE:
+ * This file is the OFFLINE & DEMO FALLBACK catalogue for the TRANSFORMATIVE Diagnostic Questions.
+ *
+ * Single Source of Truth:
+ * The primary, canonical source of truth for diagnostic questions is the Supabase PostgreSQL
+ * database (`public.questions` table, seeded via `supabase/seed.sql`).
+ *
+ * This fallback catalogue is only used when:
+ * 1. `isSupabaseConfigured === false` (Demo / Offline mode)
+ * 2. Network requests to Supabase fail, time out, or return zero rows
+ *
+ * Do not treat this file as a parallel source of truth. Questions modifications, additions,
+ * or ordering should be committed to `supabase/seed.sql`.
  */
 
 import { Question, InterviewTier } from '../types';

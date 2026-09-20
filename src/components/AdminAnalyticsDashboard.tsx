@@ -32,16 +32,45 @@ import {
   Building,
   Scale,
   Award,
+  RefreshCw,
 } from 'lucide-react';
 import { useInterviews } from '../context/InterviewContext';
 import { useAuth } from '../context/AuthContext';
 import { InterviewerNote } from '../types';
+import { refreshQuestionsCache, getQuestionsCacheMetadata } from '../lib/questionsService';
 
 export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) => void }> = ({
   onOpenInterview,
 }) => {
   const { allInterviewsGlobal, notes, checklists } = useInterviews();
   const { user } = useAuth();
+  const [isRefreshingQuestions, setIsRefreshingQuestions] = useState(false);
+  const [refreshFeedback, setRefreshFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const handleRefreshQuestions = async () => {
+    setIsRefreshingQuestions(true);
+    setRefreshFeedback(null);
+    try {
+      const res = await refreshQuestionsCache();
+      setRefreshFeedback({
+        type: res.success ? 'success' : 'error',
+        message: res.message,
+      });
+      setTimeout(() => {
+        setRefreshFeedback(null);
+      }, 6000);
+    } catch (err: any) {
+      setRefreshFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to refresh questions cache',
+      });
+    } finally {
+      setIsRefreshingQuestions(false);
+    }
+  };
 
   const totalInterviews = allInterviewsGlobal.length;
   const completed = allInterviewsGlobal.filter((i) => i.status === 'Completed').length;
@@ -176,8 +205,21 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full sm:w-auto">
           <button
+            id="admin-refresh-questions-btn"
+            data-testid="admin-refresh-questions-btn"
+            onClick={handleRefreshQuestions}
+            disabled={isRefreshingQuestions}
+            className="w-full sm:w-auto px-4 py-2.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs min-h-[42px]"
+            title="Force synchronization with Supabase public.questions table"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshingQuestions ? 'animate-spin' : ''}`} />
+            <span>{isRefreshingQuestions ? 'Refreshing Cache...' : 'Refresh Questions Cache'}</span>
+          </button>
+
+          <button
+            id="admin-export-json-btn"
             onClick={handleExportJSON}
             className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs min-h-[42px]"
           >
@@ -186,6 +228,29 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
           </button>
         </div>
       </div>
+
+      {/* Sync Status Banner */}
+      {refreshFeedback && (
+        <div
+          data-testid="refresh-questions-feedback"
+          className={`p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between transition ${
+            refreshFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span>{refreshFeedback.message}</span>
+          </div>
+          <button
+            onClick={() => setRefreshFeedback(null)}
+            className="text-slate-400 hover:text-slate-600 text-xs px-2 py-0.5 rounded cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Aggregate Quantitative Baseline Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
