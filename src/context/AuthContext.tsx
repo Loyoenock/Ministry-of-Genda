@@ -318,12 +318,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchOrCreateProfile, isTestEnv]);
 
-  // Realtime subscription for profile changes (role updates across tabs/browsers)
+  // Realtime subscription for profile changes (role and profile updates across tabs/browsers)
   useEffect(() => {
     if (!isSupabaseConfigured || isTestEnv || !currentUser) return;
 
     const channel = supabase
-      .channel(`profile-role-changes-${currentUser.id}`)
+      .channel(`profile-changes-${currentUser.id}`)
       .on(
         'postgres_changes',
         {
@@ -334,11 +334,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         (payload) => {
           const newRecord = payload.new as any;
-          if (newRecord && newRecord.role) {
+          if (newRecord) {
             const mappedRole = (newRecord.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
-            setCurrentUser((prev) => (prev ? { ...prev, role: mappedRole } : null));
-            setActualRole(mappedRole);
-            setActiveRole(mappedRole);
+            setCurrentUser((prev) => (prev ? {
+              ...prev,
+              ...newRecord,
+              role: mappedRole,
+            } : null));
+            if (newRecord.role) {
+              setActualRole(mappedRole);
+              setActiveRole(mappedRole);
+            }
           }
         }
       )
