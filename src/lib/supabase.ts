@@ -6,13 +6,22 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables with quote stripping and whitespace trimming
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/^["']|["']$/g, '').trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').replace(/^["']|["']$/g, '').trim();
+// Environment variables with quote stripping and whitespace trimming (supporting SUPABASE_URL and SUPABASE_ANON_KEY, with VITE_ fallback)
+const rawUrl = (
+  import.meta.env.SUPABASE_URL ||
+  import.meta.env.VITE_SUPABASE_URL ||
+  ''
+).replace(/^["']|["']$/g, '').trim();
+
+const rawKey = (
+  import.meta.env.SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  ''
+).replace(/^["']|["']$/g, '').trim();
 
 if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'development')) {
-  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_URL:', rawUrl ? `${rawUrl.substring(0, 25)}...` : 'MISSING');
-  console.log('[Supabase Config Diagnostics] VITE_SUPABASE_ANON_KEY:', rawKey ? `${rawKey.substring(0, 12)}... (length: ${rawKey.length})` : 'MISSING');
+  console.log('[Supabase Config Diagnostics] SUPABASE_URL:', rawUrl ? `${rawUrl.substring(0, 25)}...` : 'MISSING');
+  console.log('[Supabase Config Diagnostics] SUPABASE_ANON_KEY:', rawKey ? `${rawKey.substring(0, 12)}... (length: ${rawKey.length})` : 'MISSING');
 }
 
 const hasUrl = Boolean(rawUrl);
@@ -23,15 +32,15 @@ const hasValidProtocol = rawUrl.startsWith('https://') || rawUrl.startsWith('htt
 
 let errorMessage: string | null = null;
 if (!hasUrl && !hasKey) {
-  errorMessage = 'Both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are missing from your environment variables.';
+  errorMessage = 'Both SUPABASE_URL and SUPABASE_ANON_KEY are missing from your environment variables.';
 } else if (!hasUrl) {
-  errorMessage = 'VITE_SUPABASE_URL is missing from your environment variables.';
+  errorMessage = 'SUPABASE_URL is missing from your environment variables.';
 } else if (!hasKey) {
-  errorMessage = 'VITE_SUPABASE_ANON_KEY is missing from your environment variables.';
+  errorMessage = 'SUPABASE_ANON_KEY is missing from your environment variables.';
 } else if (isUrlPlaceholder || isKeyPlaceholder) {
   errorMessage = 'Detected placeholder values in Supabase environment variables. Please replace them with your actual Supabase project URL and anon API key.';
 } else if (!hasValidProtocol) {
-  errorMessage = 'VITE_SUPABASE_URL must start with https:// or http://.';
+  errorMessage = 'SUPABASE_URL must start with https:// or http://.';
 }
 
 export const isConfigured = Boolean(
