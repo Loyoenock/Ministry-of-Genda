@@ -155,7 +155,7 @@ describe('LoginView Component - Domain Restrictions & Validation UX', () => {
     });
 
     const error = screen.getByTestId('email-error');
-    expect(error.textContent).toContain('Please enter your ministry email address.');
+    expect(error.textContent).toContain('Please enter your email address.');
   });
 
   it('blocks invalid email format client-side and shows inline error', async () => {
@@ -170,7 +170,7 @@ describe('LoginView Component - Domain Restrictions & Validation UX', () => {
     fireEvent.blur(emailInput);
 
     const error = screen.getByTestId('email-error');
-    expect(error.textContent).toContain('Please enter a valid ministry email address.');
+    expect(error.textContent).toContain('Please enter a valid email address.');
   });
 
   it('rejects unauthorised domains on blur with clear error message', async () => {
@@ -532,9 +532,9 @@ describe('LoginView - Supabase Auth Error Feedback & Duplicate Handling', () => 
       fireEvent.click(screen.getByTestId('login-submit-btn'));
     });
 
-    const confirmationPanel = await screen.findByTestId('login-confirmation-panel');
-    expect(confirmationPanel.textContent).toContain(
-      'Confirm your email to activate your account'
+    const successAlert = await screen.findByTestId('login-success-alert');
+    expect(successAlert.textContent).toContain(
+      'Account created successfully. Please check your inbox to confirm your email before signing in.'
     );
   });
 });

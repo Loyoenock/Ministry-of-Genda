@@ -66,7 +66,7 @@ export function validateEmail(email: string): EmailValidationResult {
   if (!trimmed) {
     return {
       isValid: false,
-      errorMessage: 'Please enter your ministry email address.',
+      errorMessage: 'Please enter your email address.',
       isMinistryDomain: false,
     };
   }
@@ -74,7 +74,7 @@ export function validateEmail(email: string): EmailValidationResult {
   if (!EMAIL_REGEX.test(trimmed)) {
     return {
       isValid: false,
-      errorMessage: 'Please enter a valid ministry email address.',
+      errorMessage: 'Please enter a valid email address.',
       isMinistryDomain: false,
     };
   }

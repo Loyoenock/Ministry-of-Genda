@@ -504,7 +504,7 @@ export const LoginView: React.FC = () => {
               {/* Email Address Field */}
               <div className="space-y-1.5">
                 <label htmlFor="login-email" className="block text-xs font-bold text-slate-700">
-                  Ministry Email Address <span className="text-red-500">*</span>
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -514,7 +514,7 @@ export const LoginView: React.FC = () => {
                     type="email"
                     autoComplete="email"
                     disabled={isSubmitting}
-                    placeholder="officer@mglsd.go.ug"
+                    placeholder="name@example.com"
                     value={email}
                     onChange={(e) => handleEmailChange(e.target.value)}
                     onBlur={handleEmailBlur}
