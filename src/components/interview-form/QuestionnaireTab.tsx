@@ -58,6 +58,27 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
   const sectionQuestions = applicableQuestions.filter((q) => q.section_code === activeSectionCode);
   const activeSection = applicableSections.find((s) => s.code === activeSectionCode);
 
+  if (applicableQuestions.length === 0) {
+    return (
+      <div
+        data-testid="empty-questions-notice"
+        className="bg-red-50 border border-red-200 rounded-2xl p-8 sm:p-12 text-center space-y-4"
+      >
+        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
+          <HelpCircle className="w-6 h-6" />
+        </div>
+        <div className="space-y-1.5 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-red-900">
+            Diagnostic questions could not be loaded from the database. Please contact the system administrator.
+          </h3>
+          <p className="text-xs text-red-700 leading-relaxed">
+            The questions table in Supabase contains 0 rows or is unseeded. The master questions catalogue must be seeded before interviews can be conducted for tier <strong>{tier}</strong>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-6 items-start">
       {/* Mobile / Tablet Horizontal Section Picker (< lg) */}

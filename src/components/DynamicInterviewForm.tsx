@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   X,
   Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { InterviewStatus, Interview } from '../types';
 import { DiagnosticExportModal } from './DiagnosticExportModal';
@@ -30,6 +31,7 @@ import { QuestionnaireTab } from './interview-form/QuestionnaireTab';
 import { DocumentsTab } from './interview-form/DocumentsTab';
 import { NotesTab } from './interview-form/NotesTab';
 import { useAuth } from '../context/AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface DynamicInterviewFormProps {
   interviewId: string;
@@ -74,6 +76,9 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     completeInterview,
     flushNotesSave,
     autoSaveStatus,
+    questionsLoading,
+    questionsError,
+    refreshQuestions,
   } = useInterviewFormState(interviewId);
 
   // Role validation: Only the assigned interviewer (owner) or an administrator can modify status or delete
@@ -540,6 +545,34 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Statutory Diagnostic Catalogue Alert */}
+      {(questionsError || (applicableQuestions.length === 0 && isSupabaseConfigured)) && (
+        <div
+          data-testid="questions-database-error-banner"
+          className="p-4 bg-red-50 border border-red-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-red-900"
+        >
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-red-950">
+                Diagnostic questions could not be loaded from the database. Please contact the system administrator.
+              </p>
+              <p className="text-[11px] text-red-700 mt-0.5">
+                The <code>public.questions</code> catalogue table in Supabase returned 0 rows. Seeding is required: run <code>supabase/seed.sql</code> or <code>npm run db:seed</code>.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => refreshQuestions(true)}
+            disabled={questionsLoading}
+            className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer shadow-xs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${questionsLoading ? 'animate-spin' : ''}`} />
+            <span>{questionsLoading ? 'Syncing...' : 'Retry Fetch'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Tab Navigation: Questions, Documents, Interviewer Notes */}
       <div className="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-2xl max-w-lg">

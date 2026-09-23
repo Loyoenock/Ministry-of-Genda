@@ -26,7 +26,14 @@ export function useInterviewFormState(interviewId: string) {
     setAutoSaveStatus,
   } = useInterviews();
 
-  const { getQuestionsForTier, getSectionsForTier } = useQuestions();
+  const {
+    questions,
+    loading: questionsLoading,
+    error: questionsError,
+    refreshQuestions,
+    getQuestionsForTier,
+    getSectionsForTier,
+  } = useQuestions();
 
   const interview = useMemo(() => {
     return interviews.find((i) => i.id === interviewId);
@@ -258,5 +265,8 @@ export function useInterviewFormState(interviewId: string) {
     deleteInterview,
     completeInterview: contextCompleteInterview,
     autoSaveStatus: effectiveAutoSaveStatus,
+    questionsLoading,
+    questionsError,
+    refreshQuestions,
   };
 }

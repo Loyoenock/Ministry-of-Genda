@@ -177,11 +177,15 @@ export const AdminAnalyticsDashboard: React.FC<{ onOpenInterview: (id: string) =
           className={`p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between transition ${
             refreshFeedback.type === 'success'
               ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-amber-50 border-amber-200 text-amber-800'
+              : 'bg-red-50 border-red-200 text-red-800'
           }`}
         >
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            {refreshFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            )}
             <span>{refreshFeedback.message}</span>
           </div>
           <button

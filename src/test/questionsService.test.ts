@@ -15,6 +15,7 @@ import {
   getQuestionsCacheMetadata,
   isQuestionsCacheStale,
   refreshQuestionsCache,
+  QUESTIONS_DB_ERROR_MESSAGE,
 } from '../lib/questionsService';
 import { Question } from '../types';
 import * as supabaseModule from '../lib/supabase';
@@ -148,7 +149,7 @@ describe('Questions Service & Dynamic Database Loading Engine', () => {
     expect(meta.isStale).toBe(false);
   });
 
-  it('mocks a network failure and asserts the fallback catalogue is used', async () => {
+  it('strictly rejects silent fallback and throws QUESTIONS_DB_ERROR_MESSAGE on network failure when Supabase is configured', async () => {
     supabaseModule.setSupabaseConfiguredForTesting(true);
 
     // Mock network rejection
@@ -158,15 +159,16 @@ describe('Questions Service & Dynamic Database Loading Engine', () => {
       }),
     } as any);
 
-    const questions = await fetchQuestionsFromSupabase();
+    // Default call must NOT silently mask the failure
+    await expect(fetchQuestionsFromSupabase()).rejects.toThrow(QUESTIONS_DB_ERROR_MESSAGE);
 
-    // Must fall back to MASTER_QUESTIONS
-    expect(questions.length).toBeGreaterThan(45);
-    expect(questions.some((q) => q.id === 'A1')).toBe(true);
-    expect(questions.some((q) => q.id === 'W1')).toBe(true);
+    // When allowDevFallback is explicitly set, fallback is permitted
+    const fallbackQuestions = await fetchQuestionsFromSupabase({ allowDevFallback: true });
+    expect(fallbackQuestions.length).toBeGreaterThan(45);
+    expect(fallbackQuestions.some((q) => q.id === 'A1')).toBe(true);
   });
 
-  it('handles Supabase query returning error payload gracefully with fallback', async () => {
+  it('strictly throws QUESTIONS_DB_ERROR_MESSAGE when Supabase query returns an error payload', async () => {
     supabaseModule.setSupabaseConfiguredForTesting(true);
 
     vi.spyOn(supabaseModule.supabase, 'from').mockReturnValue({
@@ -178,9 +180,22 @@ describe('Questions Service & Dynamic Database Loading Engine', () => {
       }),
     } as any);
 
-    const questions = await fetchQuestionsFromSupabase();
-    expect(questions.length).toBeGreaterThan(45);
-    expect(questions.some((q) => q.id === 'A1')).toBe(true);
+    await expect(fetchQuestionsFromSupabase()).rejects.toThrow(QUESTIONS_DB_ERROR_MESSAGE);
+  });
+
+  it('strictly throws QUESTIONS_DB_ERROR_MESSAGE and purges cache when public.questions returns 0 rows', async () => {
+    supabaseModule.setSupabaseConfiguredForTesting(true);
+
+    vi.spyOn(supabaseModule.supabase, 'from').mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
+      }),
+    } as any);
+
+    await expect(fetchQuestionsFromSupabase()).rejects.toThrow(QUESTIONS_DB_ERROR_MESSAGE);
   });
 
   it('handles 24-hour cache expiry correctly via isQuestionsCacheStale', () => {

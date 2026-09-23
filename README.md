@@ -11,11 +11,12 @@ A role-based, enterprise diagnostic interview and institutional assessment platf
 3. [Prerequisites](#3-prerequisites)
 4. [Local Development Setup](#4-local-development-setup)
 5. [Supabase Backend Setup](#5-supabase-backend-setup)
-6. [Available Scripts](#6-available-scripts)
-7. [Project Structure](#7-project-structure)
-8. [Role Model & Security Notes](#8-role-model--security-notes)
-9. [Known Limitations & Technical Debt](#9-known-limitations--technical-debt)
-10. [Contributing & Next Steps](#10-contributing--next-steps)
+6. [Database Seeding & Master Catalogue Maintenance](#6-database-seeding--master-catalogue-maintenance)
+7. [Available Scripts](#7-available-scripts)
+8. [Project Structure](#8-project-structure)
+9. [Role Model & Security Notes](#9-role-model--security-notes)
+10. [Known Limitations & Technical Debt](#10-known-limitations--technical-debt)
+11. [Contributing & Next Steps](#11-contributing--next-steps)
 
 ---
 
@@ -362,7 +363,91 @@ When running in live Supabase mode (`isSupabaseConfigured === true`), new field 
 
 ---
 
-## 6. Available Scripts
+## 6. Database Seeding & Master Catalogue Maintenance
+
+### Why Seeding is Mandatory
+While schema migrations (`supabase/migrations/20250916_initial_schema.sql`) establish table structures, foreign keys, and RLS policies, they **do not populate records**. The `public.questions` table will remain completely empty (0 rows) until the diagnostic questionnaire catalogue is explicitly seeded.
+
+### Hardened Single Source of Truth
+The application strictly treats the remote Supabase database as the definitive single source of truth. When `isSupabaseConfigured === true`:
+- The application queries `public.questions` on startup and caches rows with a 24-hour TTL.
+- **No Silent Fallback**: If `public.questions` returns 0 rows, the application will **not** silently inject mock questions in production. Instead, it logs a critical error and surfaces an immediate, user-visible banner:
+  > *"Diagnostic questions could not be loaded from the database. Please contact the system administrator."*
+- This fail-safe architecture guarantees that an unseeded or corrupted database is surfaced immediately to administrators rather than masquerading as healthy.
+
+---
+
+### Seeding Methods
+
+#### Method 1: Supabase Dashboard SQL Editor (Recommended for Remote Projects)
+1. Open the [Supabase Dashboard](https://app.supabase.com) and navigate to your project.
+2. Click **SQL Editor** in the left navigation sidebar.
+3. Click **New Query**, copy the entire contents of `supabase/seed.sql`, and paste it into the editor.
+4. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
+5. Confirm that the query succeeds without errors.
+
+#### Method 2: Idempotent Migration Execution
+For CI/CD pipelines and automated environments, a dedicated idempotent seed migration is provided at:
+`supabase/migrations/20260923_seed_questions_catalogue.sql`
+
+This migration uses `ON CONFLICT (id) DO UPDATE` to safely seed or refresh the 52 statutory questions without truncating active interviews or responses.
+```bash
+# Using Supabase CLI
+supabase db push
+# Or reset local development instance
+supabase db reset
+```
+
+#### Method 3: Automated CLI / Script Seeding
+A TypeScript automation utility is provided in `scripts/seedQuestions.ts`:
+```bash
+# Run verification and automated seed
+npm run db:seed
+```
+If `SUPABASE_SERVICE_ROLE_KEY` is present in your environment, `npm run db:seed` will automatically populate the remote database using admin privileges and verify row counts across all sections.
+
+---
+
+### Post-Seed Verification Queries
+
+Run the following SQL statements in the Supabase **SQL Editor** to verify that the master catalogue is fully populated:
+
+```sql
+-- 1. Verify total questions count (Must return exactly 52)
+SELECT count(*) AS total_questions FROM public.questions;
+
+-- 2. Verify distribution across all statutory sections
+SELECT 
+    section_code,
+    count(*) AS questions_per_section
+FROM public.questions 
+GROUP BY section_code 
+ORDER BY section_code;
+```
+
+#### Expected Master Questionnaire Distribution
+| Section Code | Section Title | Question Count | Applicable Tiers |
+| :---: | :--- | :---: | :--- |
+| **A** | Strategy, Policy & Mandate | **8** | Leadership, Management |
+| **B** | Institutional Structure, Governance & Oversight | **8** | Leadership, Management |
+| **C** | Operational Delivery & Core Workflows | **5** | Frontline, Management |
+| **D** | Human Resources, Staffing & Capability | **6** | Leadership, Management |
+| **E** | Information Systems, Technology & Data | **7** | Support/IT, Management, Frontline |
+| **F** | Budget, Finance & Resource Allocation | **5** | Leadership, Management, Frontline |
+| **G** | Stakeholder Engagement & Social Dialogue | **6** | Leadership, Management, Support/IT |
+| **H** | Strategic Challenges, Vision & Priority Reforms | **3** | All 4 Tiers |
+| **W** | System Walkthrough & Live Demonstrations | **4** | Support/IT |
+| **TOTAL** | **Full Uganda Labour Diagnostic Catalogue** | **52** | **100% Comprehensive Coverage** |
+
+---
+
+### In-App Synchronization & Health Check
+- **Admin Analytics Dashboard**: Click the **"Refresh Questions Cache"** button in the header toolbar to immediately purge local cache and re-query `public.questions` from Supabase.
+- **Interviewer Field Manual & Support (`/support`)**: The **Database & Master Catalogue Health Check** card displays the live connection target, question count, and provenance source (`Supabase Live Table`, `Encrypted Local Cache`, or `Database Unseeded`).
+
+---
+
+## 7. Available Scripts
 
 The project includes the following commands defined in `package.json`:
 
@@ -373,11 +458,12 @@ The project includes the following commands defined in `package.json`:
 | `bun run preview`| `npm run preview` | Starts a local server previewing the production build in `dist/` |
 | `bun run lint` | `npm run lint` | Executes TypeScript strict type check (`tsc --noEmit`) |
 | `bun run test` | `npm run test` | Executes the Vitest test suite (`vitest run`) |
+| `bun run db:seed` | `npm run db:seed` | Verifies and seeds the remote `public.questions` table |
 | `bun run clean` | `npm run clean` | Removes `dist` and temporary build output artifacts |
 
 ---
 
-## 7. Project Structure
+## 8. Project Structure
 
 ```
 ├── .env.example                     # Environment template documenting all variables
@@ -445,7 +531,7 @@ The project includes the following commands defined in `package.json`:
 
 ---
 
-## 8. Role Model & Security Notes
+## 9. Role Model & Security Notes
 
 ### Role Definitions
 | Role | Capabilities | Permitted Views |
@@ -475,7 +561,7 @@ To prevent unauthorized privilege escalation (`await supabase.from('profiles').u
 
 ---
 
-## 9. Known Limitations & Technical Debt
+## 10. Known Limitations & Technical Debt
 
 During recent architectural audits, the following areas were identified for future refactoring:
 
@@ -492,7 +578,7 @@ During recent architectural audits, the following areas were identified for futu
 
 ---
 
-## 10. Contributing & Next Steps
+## 11. Contributing & Next Steps
 
 When contributing to this repository, please adhere to the following development practices:
 

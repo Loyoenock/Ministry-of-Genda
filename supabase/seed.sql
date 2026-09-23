@@ -7,6 +7,15 @@
 -- Clean slate for seed reload
 TRUNCATE TABLE public.questions CASCADE;
 
+-- Ensure questions are readable by all clients (authenticated officers as well as unauthenticated pre-auth cache warming)
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Questions readable by authenticated users" ON public.questions;
+DROP POLICY IF EXISTS "Questions readable by everyone" ON public.questions;
+CREATE POLICY "Questions readable by everyone"
+    ON public.questions FOR SELECT
+    TO public
+    USING (true);
+
 -- SECTION A: STRATEGY, POLICY & MANDATE
 INSERT INTO public.questions (id, section_code, section_title, question_text, who_to_ask, prompt_hints, applicable_tiers, response_type, sort_order) VALUES
 ('A1', 'A', 'Section A: Strategy, Policy & Mandate',
@@ -360,3 +369,18 @@ ARRAY['Support/IT'], 'structured', 55),
 'System Administrator / Security Lead',
 'Observe: User lifecycle management; deprovisioning of departed officers; review of audit log entries (who viewed/edited sensitive migrant or enterprise inspection files).',
 ARRAY['Support/IT'], 'structured', 56);
+
+-- =====================================================================
+-- POST-SEED VERIFICATION QUERIES:
+-- Run these statements in the Supabase SQL Editor to verify the master catalogue:
+--
+-- SELECT count(*) AS total_questions FROM public.questions;
+-- (Expected result: 52)
+--
+-- SELECT section_code, count(*) AS questions_per_section
+-- FROM public.questions
+-- GROUP BY section_code
+-- ORDER BY section_code;
+-- (Expected breakdown: A: 8, B: 8, C: 5, D: 6, E: 7, F: 5, G: 6, H: 3, W: 4)
+-- =====================================================================
+
