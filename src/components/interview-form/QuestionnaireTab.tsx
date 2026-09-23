@@ -6,9 +6,11 @@
 import React from 'react';
 import {
   CheckCircle,
+  CheckCircle2,
   ChevronRight,
   ChevronLeft,
   HelpCircle,
+  Loader2,
 } from 'lucide-react';
 import { Question, InterviewTier } from '../../types';
 import { SectionConfig } from '../../lib/questionsData';
@@ -29,6 +31,9 @@ interface QuestionnaireTabProps {
   prevSectionCode?: string;
   nextSectionCode?: string;
   currentSectionIndex: number;
+  isLastSection: boolean;
+  onFinishInterview: () => void;
+  isCompleting?: boolean;
 }
 
 export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
@@ -46,6 +51,9 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
   prevSectionCode,
   nextSectionCode,
   currentSectionIndex,
+  isLastSection,
+  onFinishInterview,
+  isCompleting = false,
 }) => {
   const sectionQuestions = applicableQuestions.filter((q) => q.section_code === activeSectionCode);
   const activeSection = applicableSections.find((s) => s.code === activeSectionCode);
@@ -290,18 +298,43 @@ export const QuestionnaireTab: React.FC<QuestionnaireTabProps> = ({
             Section {currentSectionIndex + 1} of {applicableSections.length}
           </span>
 
-          <button
-            disabled={!hasNextSection}
-            onClick={onNextSection}
-            className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[40px] ${
-              hasNextSection
-                ? 'bg-teal-700 text-white hover:bg-teal-800'
-                : 'opacity-40 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <span>Next: {nextSectionCode || 'End'}</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {isLastSection ? (
+            <button
+              disabled={isCompleting}
+              onClick={onFinishInterview}
+              data-testid="finish-interview-btn"
+              className={`px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 transition shadow-md min-h-[44px] ${
+                isCompleting
+                  ? 'bg-teal-800 text-white opacity-70 cursor-wait'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
+              }`}
+            >
+              {isCompleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Completing & Saving...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>Finish Interview & Complete</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              disabled={!hasNextSection}
+              onClick={onNextSection}
+              className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[40px] ${
+                hasNextSection
+                  ? 'bg-teal-700 text-white hover:bg-teal-800'
+                  : 'opacity-40 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <span>Next: {nextSectionCode || 'End'}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

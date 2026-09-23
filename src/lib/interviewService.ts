@@ -298,6 +298,29 @@ export async function deleteInterviewFromSupabase(id: string): Promise<boolean> 
 }
 
 /**
+ * Completes an interview in Supabase, marking status as Completed and updating completion percentage
+ */
+export async function completeInterviewInSupabase(
+  id: string,
+  completionPercentage: number
+): Promise<void> {
+  if (!isSupabaseConfigured || !isUuid(id)) return;
+
+  const { error } = await supabase
+    .from('interviews')
+    .update({
+      status: 'Completed',
+      completion_percentage: Math.min(100, Math.max(0, completionPercentage)),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to complete interview in database: ${error.message}`);
+  }
+}
+
+/**
  * Remove local storage entries for an interview in demo mode or offline cache
  */
 export function removeDemoStorageEntriesForInterview(interviewId: string): void {

@@ -21,6 +21,7 @@ export function useInterviewFormState(interviewId: string) {
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
+    completeInterview: contextCompleteInterview,
     autoSaveStatus: contextAutoSaveStatus,
     setAutoSaveStatus,
   } = useInterviews();
@@ -255,6 +256,7 @@ export function useInterviewFormState(interviewId: string) {
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
+    completeInterview: contextCompleteInterview,
     autoSaveStatus: effectiveAutoSaveStatus,
   };
 }

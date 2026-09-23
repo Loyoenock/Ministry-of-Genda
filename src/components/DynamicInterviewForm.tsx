@@ -72,12 +72,41 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
+    completeInterview,
+    flushNotesSave,
     autoSaveStatus,
   } = useInterviewFormState(interviewId);
 
   // Role validation: Only the assigned interviewer (owner) or an administrator can modify status or delete
   const isOwner = Boolean(user && interview && interview.interviewer_id === user.id);
   const canModify = Boolean(isAdmin || isOwner);
+
+  const [isCompleting, setIsCompleting] = useState<boolean>(false);
+
+  const handleFinishInterview = async () => {
+    if (!interview || !canModify) {
+      showToast('warning', 'Only the assigned interviewer or an administrator can complete this interview.');
+      return;
+    }
+
+    setIsCompleting(true);
+    try {
+      // Flush any pending auto-saves
+      await flushNotesSave();
+
+      // Complete interview in Supabase and context
+      await completeInterview(interview.id, overallPercentage);
+
+      showToast('success', `Interview successfully completed! Score: ${overallPercentage}%`);
+
+      setTimeout(() => {
+        onBack();
+      }, 1200);
+    } catch (err: any) {
+      setIsCompleting(false);
+      showToast('error', `Failed to finish interview: ${err?.message || 'Error occurred'}`);
+    }
+  };
 
   const showToast = (type: 'success' | 'warning' | 'error', message: string) => {
     if (toastTimerRef.current) {
@@ -573,6 +602,9 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           prevSectionCode={prevSection?.code}
           nextSectionCode={nextSection?.code}
           currentSectionIndex={currentSectionIndex}
+          isLastSection={currentSectionIndex === applicableSections.length - 1}
+          onFinishInterview={handleFinishInterview}
+          isCompleting={isCompleting}
         />
       )}
 

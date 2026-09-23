@@ -23,6 +23,7 @@ import {
   fetchOrInitChecklistFromSupabase,
   fetchOrInitNotesFromSupabase,
   removeDemoStorageEntriesForInterview,
+  completeInterviewInSupabase,
 } from '../lib/interviewService';
 
 export interface InterviewContextType {
@@ -45,6 +46,7 @@ export interface InterviewContextType {
   ) => Interview;
   updateInterview: (id: string, updates: Partial<Interview>) => void | Promise<void>;
   deleteInterview: (id: string) => void | Promise<void>;
+  completeInterview: (id: string, completionPercentage: number) => Promise<void>;
   getInterviewAnswers: (interviewId: string) => Answer[];
   saveAnswer: (
     interviewId: string,
@@ -179,6 +181,20 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [interviewRecords, answersState, checklistState, notesState]
   );
 
+  const completeInterview = useCallback(
+    async (id: string, completionPercentage: number) => {
+      await interviewRecords.updateInterview(id, {
+        status: 'Completed',
+        completion_percentage: Math.min(100, Math.max(0, completionPercentage)),
+        updated_at: new Date().toISOString(),
+      });
+      if (isSupabaseConfigured && isUuid(id)) {
+        await completeInterviewInSupabase(id, completionPercentage);
+      }
+    },
+    [interviewRecords]
+  );
+
   return (
     <InterviewContext.Provider
       value={{
@@ -199,6 +215,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         createInterview: interviewRecords.createInterview,
         updateInterview: interviewRecords.updateInterview,
         deleteInterview: handleDeleteInterview,
+        completeInterview,
         getInterviewAnswers: answersState.getInterviewAnswers,
         saveAnswer: answersState.saveAnswer,
         getInterviewChecklist: checklistState.getInterviewChecklist,
