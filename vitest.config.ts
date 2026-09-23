@@ -15,8 +15,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'e2e/**'],
-    pool: 'vmThreads',
-    isolate: false,
+    fileParallelism: false,
   },
   resolve: {
     alias: {

@@ -12,6 +12,7 @@ import {
   fetchAnswersFromSupabase,
   upsertAnswerInSupabase,
   updateInterviewInSupabase,
+  ensureInterviewPersisted,
 } from '../lib/interviewService';
 import { calculateInterviewProgress, calculateNextStatus } from '../lib/interviewCalculations';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
@@ -116,20 +117,29 @@ export function useAnswersState({
       }
 
       try {
-        const results = await Promise.all(
-          savesToExecute.map((item) =>
-            upsertAnswerInSupabase(
+        await ensureInterviewPersisted(interviewId);
+        const failedSaves: PendingSaveItem[] = [];
+        for (const item of savesToExecute) {
+          try {
+            const saved = await upsertAnswerInSupabase(
               item.interviewId,
               item.questionId,
               item.text,
               item.structuredData,
               userId || undefined
-            )
-          )
-        );
+            );
+            if (!saved) throw new Error('Answer upsert returned no data');
+          } catch (err) {
+            console.error('[answers] flush item failed', err);
+            failedSaves.push(item);
+            const fKey = `${item.interviewId}-${item.questionId}`;
+            pendingSaves.current[fKey] = item;
+          }
+        }
 
-        if (results.some((res) => res === null)) {
-          throw new Error('Failed to persist one or more questionnaire answers to database.');
+        if (failedSaves.length > 0) {
+          setAutoSaveStatus('error');
+          throw new Error(`Failed to persist ${failedSaves.length} answers during flush.`);
         }
 
         if (savesToExecute.length > 0) {
@@ -227,20 +237,31 @@ export function useAnswersState({
 
         if (isSupabaseConfigured && isUuid(interviewId)) {
           try {
-            await upsertAnswerInSupabase(
+            await ensureInterviewPersisted(interviewId);
+            const saved = await upsertAnswerInSupabase(
               interviewId,
               questionId,
               text,
               structuredData,
               userId || undefined
             );
+            if (!saved) throw new Error('Answer upsert returned no data');
             await updateInterviewInSupabase(interviewId, {
               completion_percentage: updatedPct,
               status: nextStatus,
             });
             setAutoSaveStatus('saved');
-          } catch {
+          } catch (err) {
+            console.error('[answers] persist failed', err);
             setAutoSaveStatus('error');
+            pendingSaves.current[key] = {
+              interviewId,
+              questionId,
+              text,
+              structuredData,
+              updatedPct,
+              nextStatus,
+            };
           }
         } else {
           setAutoSaveStatus('saved');

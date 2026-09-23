@@ -204,6 +204,44 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Auto-save error banner */}
+      {autoSaveStatus === 'error' && (
+        <div
+          data-testid="autosave-error-banner"
+          className="p-4 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-2xl flex items-center justify-between shadow-lg sticky top-20 z-20 animate-fadeIn"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-rose-200 text-rose-800 rounded-xl shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rose-700" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-rose-900">
+                Answers could not be saved to the server. Check your connection and try again.
+              </p>
+              <p className="text-[11px] text-rose-700">
+                Your changes are cached locally and will be re-synchronized upon retry.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="autosave-retry-btn"
+            onClick={async () => {
+              try {
+                await flushAnswersSave(interview.id);
+                showToast('success', 'Pending answers re-synchronized successfully.');
+              } catch {
+                showToast('error', 'Retry failed. Please check connection and try again.');
+              }
+            }}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shrink-0 shadow-md"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
+
       {/* Diagnostic PDF/Word/Excel Export Modal */}
       {exportModalOpen && (
         <DiagnosticExportModal

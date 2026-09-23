@@ -206,41 +206,58 @@ export async function fetchAllInterviewsGlobalFromSupabase(): Promise<Interview[
 /**
  * Insert a new interview into Supabase
  */
-export async function insertInterviewToSupabase(interview: Interview): Promise<Interview | null> {
-  if (!isSupabaseConfigured) return null;
+export async function insertInterviewToSupabase(interview: Interview): Promise<Interview> {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase is not configured.');
+  }
 
-  try {
-    const insertPayload = {
-      id: interview.id,
-      interviewee_name: interview.interviewee_name,
-      role_title: interview.role_title,
-      department_unit: interview.department_unit,
-      years_in_role: interview.years_in_role,
-      interview_date: interview.interview_date,
-      interview_time: interview.interview_time,
-      location: interview.location,
-      interviewer_id: interview.interviewer_id,
-      tier: interview.tier,
-      status: interview.status,
-      duration_min: interview.duration_min,
-      completion_percentage: interview.completion_percentage,
-    };
+  const insertPayload = {
+    id: interview.id,
+    interviewee_name: interview.interviewee_name,
+    role_title: interview.role_title,
+    department_unit: interview.department_unit,
+    years_in_role: interview.years_in_role,
+    interview_date: interview.interview_date,
+    interview_time: interview.interview_time,
+    location: interview.location,
+    interviewer_id: interview.interviewer_id,
+    tier: interview.tier,
+    status: interview.status,
+    duration_min: interview.duration_min,
+    completion_percentage: interview.completion_percentage,
+  };
 
-    const { data, error } = await supabase
-      .from('interviews')
-      .insert([insertPayload])
-      .select('*, profiles:interviewer_id(full_name)')
-      .single();
+  const { data, error } = await supabase
+    .from('interviews')
+    .insert([insertPayload])
+    .select('*, profiles:interviewer_id(full_name)')
+    .single();
 
-    if (error) {
-      console.warn('Supabase insert interview notice:', error.message);
-      return null;
-    }
+  if (error) {
+    throw new Error(`Supabase insert interview failed [code: ${error.code}]: ${error.message}${error.details ? ` (Details: ${error.details})` : ''}`);
+  }
 
-    return mapRowToInterview(data);
-  } catch (err) {
-    console.warn('Error inserting interview to Supabase:', err);
-    return null;
+  if (!data) {
+    throw new Error('Supabase insert interview returned no data.');
+  }
+
+  return mapRowToInterview(data);
+}
+
+/**
+ * Ensures an interview exists in Supabase before writing dependent records (answers/checklist).
+ */
+export async function ensureInterviewPersisted(interviewId: string): Promise<void> {
+  if (!isSupabaseConfigured || !isUuid(interviewId)) return;
+
+  const { data, error } = await supabase
+    .from('interviews')
+    .select('id')
+    .eq('id', interviewId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error('Interview is not yet available in the database. Wait a moment and try again.');
   }
 }
 
@@ -353,38 +370,41 @@ export async function upsertAnswerInSupabase(
   text: string,
   structuredData?: Record<string, any>,
   updatedBy?: string
-): Promise<Answer | null> {
-  if (!isSupabaseConfigured || !isUuid(interviewId)) return null;
-
-  try {
-    const payload: any = {
-      interview_id: interviewId,
-      question_id: questionId,
-      answer_text: text,
-      structured_data: structuredData || {},
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updatedBy && isUuid(updatedBy)) {
-      payload.updated_by = updatedBy;
-    }
-
-    const { data, error } = await supabase
-      .from('answers')
-      .upsert(payload, { onConflict: 'interview_id,question_id' })
-      .select('*')
-      .single();
-
-    if (error) {
-      console.warn('Supabase upsert answer notice:', error.message);
-      return null;
-    }
-
-    return mapRowToAnswer(data);
-  } catch (err) {
-    console.warn('Error upserting answer in Supabase:', err);
-    return null;
+): Promise<Answer> {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase is not configured.');
   }
+  if (!isUuid(interviewId)) {
+    throw new Error(`Invalid interview ID UUID: ${interviewId}`);
+  }
+
+  const payload: any = {
+    interview_id: interviewId,
+    question_id: questionId,
+    answer_text: text,
+    structured_data: structuredData || {},
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updatedBy && isUuid(updatedBy)) {
+    payload.updated_by = updatedBy;
+  }
+
+  const { data, error } = await supabase
+    .from('answers')
+    .upsert(payload, { onConflict: 'interview_id,question_id' })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(`Supabase upsert answer failed [code: ${error.code}]: ${error.message}${error.details ? ` (Details: ${error.details})` : ''}`);
+  }
+
+  if (!data) {
+    throw new Error('Supabase upsert answer returned no data.');
+  }
+
+  return mapRowToAnswer(data);
 }
 
 /**
