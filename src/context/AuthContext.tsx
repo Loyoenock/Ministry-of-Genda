@@ -160,12 +160,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]);
 
         if (insertErr) {
-          console.warn('Profile creation fallback warning:', insertErr.message);
+          console.error('[profiles] insert failed', insertErr);
+          if (insertErr.code === '23505' || insertErr.message?.includes('duplicate key') || insertErr.message?.includes('conflict')) {
+            const { data: existingRow } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authUser.id)
+              .maybeSingle();
+            if (existingRow) {
+              const mappedRole = (existingRow.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
+              const profile: UserProfile = {
+                id: existingRow.id,
+                email: existingRow.email,
+                full_name: existingRow.full_name,
+                role: mappedRole,
+                department_unit: existingRow.department_unit || 'Labour Directorate',
+                phone_number: existingRow.phone_number || undefined,
+                avatar_url: existingRow.avatar_url || undefined,
+              };
+              setCurrentUser(profile);
+              setActualRole(mappedRole);
+              setActiveRole(mappedRole);
+            }
+          }
+        } else {
+          setCurrentUser(newProfile);
+          setActualRole(newProfile.role);
+          setActiveRole(newProfile.role);
         }
-
-        setCurrentUser(newProfile);
-        setActualRole(newProfile.role);
-        setActiveRole(newProfile.role);
       }
 
       // Fetch staff list for User Management
@@ -410,7 +432,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        setLoading(false);
         const mapped = mapSignUpError(error);
         setAuthError(mapped.message);
         return { error: new Error(mapped.message), code: mapped.code };
@@ -419,7 +440,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Supabase duplicate email detection when email confirmation is enabled:
       // Supabase returns an obfuscated user object with an empty identities array []
       if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        setLoading(false);
         const msg = 'An account with this email already exists. Please sign in instead.';
         setAuthError(msg);
         return {
@@ -436,19 +456,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: null, needsConfirmation: false };
         } else {
           // Confirmation email was sent; user needs to confirm
-          setLoading(false);
           setAuthError(null);
           return { error: null, needsConfirmation: true };
         }
       }
 
-      setLoading(false);
       return { error: null, needsConfirmation: true };
     } catch (err: any) {
-      setLoading(false);
       const mapped = mapSignUpError(err);
       setAuthError(mapped.message);
       return { error: new Error(mapped.message), code: mapped.code };
+    } finally {
+      setLoading(false);
     }
   };
 

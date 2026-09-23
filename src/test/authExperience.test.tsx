@@ -532,9 +532,9 @@ describe('LoginView - Supabase Auth Error Feedback & Duplicate Handling', () => 
       fireEvent.click(screen.getByTestId('login-submit-btn'));
     });
 
-    const successAlert = await screen.findByTestId('login-success-alert');
-    expect(successAlert.textContent).toContain(
-      'Account created successfully. Please check your inbox to confirm your email before signing in.'
+    const confirmationPanel = await screen.findByTestId('login-confirmation-panel');
+    expect(confirmationPanel.textContent).toContain(
+      'Confirm your email to activate your account'
     );
   });
 });
