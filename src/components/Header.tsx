@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileNav,
   isMobileNavOpen = false,
 }) => {
-  const { user, role, actualRole, switchRole, logout, isDemoMode, isSupabaseConfigured } = useAuth();
+  const { user, role, actualRole, switchRole, logout, isSupabaseConfigured } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -297,18 +297,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>
                   </button>
-                  {isDemoMode && (
-                    <button
-                      onClick={() => {
-                        switchRole('interviewer');
-                        setDropdownOpen(false);
-                      }}
-                      className="text-[11px] text-slate-500 hover:text-slate-700 flex items-center space-x-1.5 w-full px-2 py-1.5 min-h-[30px]"
-                    >
-                      <UserCheck className="w-3 h-3" />
-                      <span>Reset to John Okello</span>
-                    </button>
-                  )}
                 </div>
               </div>
             )}

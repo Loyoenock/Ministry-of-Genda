@@ -18,7 +18,6 @@ export interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   session: Session | null;
-  isDemoMode: boolean;
   isSupabaseConfigured: boolean;
   allUsers: UserProfile[];
   authError: string | null;
@@ -31,7 +30,6 @@ export interface AuthContextType {
   ) => Promise<{ error: any; needsConfirmation?: boolean; code?: AuthErrorCode }>;
   logout: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
-  demoLogin: (role?: UserRole) => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void> | void;
   addNewUser: (newUser: Omit<UserProfile, 'id'>) => Promise<void> | void;
@@ -39,7 +37,8 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INITIAL_USERS: UserProfile[] = [
+// Minimal test fixtures kept exclusively for automated test suite isolation
+const TEST_USERS: UserProfile[] = [
   INITIAL_CURRENT_USER,
   ADMIN_USER,
   {
@@ -71,25 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isTestEnv) {
       return INITIAL_CURRENT_USER;
     }
-    // In real Supabase mode, never allow localStorage demo users to override or seed authentication
-    if (isSupabaseConfigured) {
-      try {
-        localStorage.removeItem('mglsd_demo_user');
-        localStorage.removeItem('mglsd_active_user_id');
-      } catch {
-        // storage guard
-      }
-      return null;
-    }
-    // In pure demo mode, check saved demo user in localStorage
-    const savedDemo = localStorage.getItem('mglsd_demo_user');
-    if (savedDemo) {
-      try {
-        return JSON.parse(savedDemo);
-      } catch {
-        // ignore parse error
-      }
-    }
     return null;
   });
 
@@ -101,12 +81,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return currentUser?.role || 'interviewer';
   });
 
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    if (isTestEnv && !isSupabaseConfigured) return true;
-    if (isSupabaseConfigured) return false;
-    return true;
-  });
-
   const [loading, setLoading] = useState<boolean>(() => {
     if (isTestEnv) return false;
     return isSupabaseConfigured;
@@ -114,43 +88,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Log clear warning to console when running in demo mode
-  useEffect(() => {
-    if (isDemoMode && !isTestEnv) {
-      console.warn(
-        '⚠️ [MGLSD Diagnostic] Application is running in DEMO MODE.\n' +
-        'Authentication and persistence are simulated using local in-memory state and browser storage.\n' +
-        'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment to run against real Supabase.'
-      );
-    }
-  }, [isDemoMode, isTestEnv]);
-
   const [users, setUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('mglsd_app_users');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
+    if (isTestEnv) {
+      return TEST_USERS;
     }
-    return INITIAL_USERS;
+    return [];
   });
-
-  // Sync users to localStorage in demo mode
-  useEffect(() => {
-    if (isDemoMode) {
-      localStorage.setItem('mglsd_app_users', JSON.stringify(users));
-    }
-  }, [users, isDemoMode]);
-
-  // Sync active user to localStorage when in demo mode
-  useEffect(() => {
-    if (isDemoMode && currentUser) {
-      localStorage.setItem('mglsd_demo_user', JSON.stringify(currentUser));
-      localStorage.setItem('mglsd_active_user_id', currentUser.id);
-    }
-  }, [currentUser, isDemoMode]);
 
   /**
    * Fetch or auto-create profile row from Supabase public.profiles table
@@ -225,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveRole(newProfile.role);
       }
 
-      // Try fetching staff list for User Management
+      // Fetch staff list for User Management
       const { data: allProfiles } = await supabase
         .from('profiles')
         .select('*')
@@ -274,19 +217,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setSession(currentSession);
         if (currentSession?.user) {
-          setIsDemoMode(false);
-          try {
-            localStorage.removeItem('mglsd_demo_user');
-            localStorage.removeItem('mglsd_active_user_id');
-          } catch {
-            // guard
-          }
           fetchOrCreateProfile(currentSession.user);
         } else {
-          // When Supabase is configured, lack of active session means unauthenticated user.
-          // Never fall back to or activate a localStorage demo user!
+          // When Supabase is configured, lack of active session means unauthenticated user
           setCurrentUser(null);
-          setIsDemoMode(false);
           setLoading(false);
         }
       })
@@ -305,16 +239,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (newSession?.user) {
-          setIsDemoMode(false);
-          localStorage.removeItem('mglsd_demo_user');
-          localStorage.removeItem('mglsd_active_user_id');
           await fetchOrCreateProfile(newSession.user);
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
-        setIsDemoMode(false);
-        localStorage.removeItem('mglsd_demo_user');
-        localStorage.removeItem('mglsd_active_user_id');
+        setActualRole('interviewer');
+        setActiveRole('interviewer');
         setLoading(false);
       }
     });
@@ -363,7 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isSupabaseConfigured, isTestEnv, currentUser?.id]);
 
   /**
-   * Real Supabase Sign In (or local fallback in demo mode)
+   * Real Supabase Sign In
    */
   const login = async (email: string, password?: string): Promise<{ error: any; code?: AuthErrorCode }> => {
     const trimmedEmail = email.trim();
@@ -387,64 +317,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setAuthError(null);
 
-    // If real Supabase is configured, require password and authenticate with Supabase Auth
-    if (isSupabaseConfigured) {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password: trimmedPassword,
-        });
+    if (!isSupabaseConfigured) {
+      const err = new Error('Supabase is not configured. Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_CREDENTIALS' };
+    }
 
-        if (error) {
-          setLoading(false);
-          const mapped = mapSignInError(error);
-          setAuthError(mapped.message);
-          return { error: new Error(mapped.message), code: mapped.code };
-        }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword,
+      });
 
-        if (data.user) {
-          setIsDemoMode(false);
-          localStorage.removeItem('mglsd_demo_user');
-          localStorage.removeItem('mglsd_active_user_id');
-          await fetchOrCreateProfile(data.user);
-        }
-        setAuthError(null);
-        return { error: null };
-      } catch (err: any) {
+      if (error) {
         setLoading(false);
-        const mapped = mapSignInError(err);
+        const mapped = mapSignInError(error);
         setAuthError(mapped.message);
         return { error: new Error(mapped.message), code: mapped.code };
       }
-    }
 
-    // Demo Mode fallback: match mock user or create temporary user
-    const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase());
-    if (existing) {
-      setCurrentUser(existing);
-      setActualRole(existing.role);
-      setActiveRole(existing.role);
-      setIsDemoMode(true);
+      if (data.user) {
+        await fetchOrCreateProfile(data.user);
+      }
       setAuthError(null);
       return { error: null };
+    } catch (err: any) {
+      setLoading(false);
+      const mapped = mapSignInError(err);
+      setAuthError(mapped.message);
+      return { error: new Error(mapped.message), code: mapped.code };
     }
-
-    const newUser: UserProfile = {
-      id: `usr-${Date.now()}`,
-      email: trimmedEmail,
-      full_name: trimmedEmail.split('@')[0].replace(/[._]/g, ' '),
-      role: 'interviewer',
-      department_unit: 'Labour Directorate',
-      avatar_url: INITIAL_CURRENT_USER.avatar_url,
-    };
-    setUsers((prev) => [...prev, newUser]);
-    setCurrentUser(newUser);
-    setActualRole('interviewer');
-    setActiveRole('interviewer');
-    setIsDemoMode(true);
-    setAuthError(null);
-    return { error: null };
   };
 
   /**
@@ -486,102 +389,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setAuthError(null);
 
-    if (isSupabaseConfigured) {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: trimmedEmail,
-          password: trimmedPassword,
-          options: {
-            data: {
-              full_name: trimmedFullName,
-              department_unit: department?.trim() || 'Labour Directorate',
-              role: 'interviewer',
-            },
+    if (!isSupabaseConfigured) {
+      const err = new Error('Supabase is not configured. Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_CREDENTIALS' };
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
+        options: {
+          data: {
+            full_name: trimmedFullName,
+            department_unit: department?.trim() || 'Labour Directorate',
+            role: 'interviewer',
           },
-        });
+        },
+      });
 
-        if (error) {
-          setLoading(false);
-          const mapped = mapSignUpError(error);
-          setAuthError(mapped.message);
-          return { error: new Error(mapped.message), code: mapped.code };
-        }
-
-        // Supabase duplicate email detection when email confirmation is enabled:
-        // Supabase returns an obfuscated user object with an empty identities array []
-        if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-          setLoading(false);
-          const msg = 'An account with this email already exists. Please sign in instead.';
-          setAuthError(msg);
-          return {
-            error: new Error(msg),
-            code: 'USER_ALREADY_EXISTS',
-          };
-        }
-
-        if (data?.user) {
-          setIsDemoMode(false);
-          localStorage.removeItem('mglsd_demo_user');
-
-          // If session exists (email confirmation disabled in Supabase project), user is logged in immediately
-          if (data.session) {
-            await fetchOrCreateProfile(data.user);
-            setAuthError(null);
-            return { error: null, needsConfirmation: false };
-          } else {
-            // Confirmation email was sent; user needs to confirm
-            setLoading(false);
-            setAuthError(null);
-            return { error: null, needsConfirmation: true };
-          }
-        }
-
+      if (error) {
         setLoading(false);
-        return { error: null, needsConfirmation: true };
-      } catch (err: any) {
-        setLoading(false);
-        const mapped = mapSignUpError(err);
+        const mapped = mapSignUpError(error);
         setAuthError(mapped.message);
         return { error: new Error(mapped.message), code: mapped.code };
       }
-    }
 
-    // Demo Mode sign up: check for duplicate email
-    const duplicate = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase());
-    if (duplicate) {
-      const msg = 'An account with this email already exists. Please sign in instead.';
-      setAuthError(msg);
-      return {
-        error: new Error(msg),
-        code: 'USER_ALREADY_EXISTS',
-      };
-    }
+      // Supabase duplicate email detection when email confirmation is enabled:
+      // Supabase returns an obfuscated user object with an empty identities array []
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setLoading(false);
+        const msg = 'An account with this email already exists. Please sign in instead.';
+        setAuthError(msg);
+        return {
+          error: new Error(msg),
+          code: 'USER_ALREADY_EXISTS',
+        };
+      }
 
-    const newUser: UserProfile = {
-      id: `usr-${Date.now()}`,
-      email: trimmedEmail,
-      full_name: trimmedFullName,
-      role: 'interviewer',
-      department_unit: department?.trim() || 'Labour Directorate',
-      avatar_url: INITIAL_CURRENT_USER.avatar_url,
-    };
-    setUsers((prev) => [...prev, newUser]);
-    setCurrentUser(newUser);
-    setActualRole('interviewer');
-    setActiveRole('interviewer');
-    setIsDemoMode(true);
-    setAuthError(null);
-    return { error: null, needsConfirmation: false };
+      if (data?.user) {
+        // If session exists (email confirmation disabled in Supabase project), user is logged in immediately
+        if (data.session) {
+          await fetchOrCreateProfile(data.user);
+          setAuthError(null);
+          return { error: null, needsConfirmation: false };
+        } else {
+          // Confirmation email was sent; user needs to confirm
+          setLoading(false);
+          setAuthError(null);
+          return { error: null, needsConfirmation: true };
+        }
+      }
+
+      setLoading(false);
+      return { error: null, needsConfirmation: true };
+    } catch (err: any) {
+      setLoading(false);
+      const mapped = mapSignUpError(err);
+      setAuthError(mapped.message);
+      return { error: new Error(mapped.message), code: mapped.code };
+    }
   };
 
   /**
-   * Logout from real Supabase or clear demo session
+   * Logout from real Supabase
    */
   const logout = async (): Promise<void> => {
-    localStorage.removeItem('mglsd_demo_user');
-    localStorage.removeItem('mglsd_active_user_id');
-
     if (isSupabaseConfigured && session) {
       try {
         await supabase.auth.signOut();
@@ -592,34 +466,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setCurrentUser(null);
     setSession(null);
-    setIsDemoMode(false);
-  };
-
-  /**
-   * Quick 1-click Demo Login for development testing:
-   * Strictly disallowed when running against real Supabase or in production builds.
-   */
-  const demoLogin = (targetRole: UserRole = 'interviewer') => {
-    // In production or when Supabase is configured, block demo login (allow in test env)
-    if ((isSupabaseConfigured && !isTestEnv) || (typeof import.meta !== 'undefined' && import.meta.env?.PROD)) {
-      console.warn('Security Warning: demoLogin is strictly disabled when Supabase is configured or in production mode.');
-      return;
-    }
-    const selected = targetRole === 'admin' ? ADMIN_USER : INITIAL_CURRENT_USER;
-    setCurrentUser(selected);
-    setActualRole(selected.role);
-    setActiveRole(selected.role);
-    setIsDemoMode(true);
-    localStorage.setItem('mglsd_demo_user', JSON.stringify(selected));
-    localStorage.setItem('mglsd_active_user_id', selected.id);
+    setActualRole('interviewer');
+    setActiveRole('interviewer');
   };
 
   /**
    * Role Switcher for previewing RLS perspectives:
-   * - In Pure Demo mode (!isSupabaseConfigured or test env): freely switch between Interviewer and Admin personas
    * - When Supabase is configured: non-admin users can NEVER call switchRole('admin') or escalate their role
    * - Only authenticated Admins who signed in through Supabase can toggle between 'admin' and 'interviewer' preview
    * - In production builds with Supabase: role switching is completely disabled
+   * - In test environments: test personas can be toggled for RLS assertions
    */
   const switchRole = (newRole: UserRole) => {
     // 1. When Supabase is configured (non-test env):
@@ -642,7 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // 2. Pure demo mode or test environment:
+    // 2. Test environment:
     if (newRole === 'admin') {
       const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
       setCurrentUser(admin);
@@ -669,7 +525,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUser = { ...currentUser, ...safeUpdates, role: currentUser.role };
     setCurrentUser(updatedUser);
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         await supabase
           .from('profiles')
@@ -701,8 +557,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const prevCurrentUser = currentUser;
     const prevActualRole = actualRole;
     const prevActiveRole = activeRole;
-    
-    console.log('Before update, prevUsers:', prevUsers.map(u => u.role));
 
     // Optimistic update
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
@@ -719,17 +573,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) throw error;
       } catch (err) {
         console.error('Error updating user role in Supabase:', err);
-        
+
         // Rollback immediately
         setUsers(() => [...prevUsers]);
         setCurrentUser(() => (prevCurrentUser ? { ...prevCurrentUser } : null));
         setActualRole(() => prevActualRole);
         setActiveRole(() => prevActiveRole);
-        
+
         triggerError('Failed to update role – changes reverted');
       }
-    } else {
-        // Fallback for demo mode
     }
   };
 
@@ -756,14 +608,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         loading,
         session,
-        isDemoMode,
         isSupabaseConfigured,
         allUsers: users,
         login,
         signUp,
         logout,
         switchRole,
-        demoLogin,
         updateProfile,
         updateUserRole,
         addNewUser,

@@ -27,7 +27,7 @@ export const DocumentsView: React.FC<{ onOpenInterview: (id: string) => void }> 
   onOpenInterview,
 }) => {
   const { interviews, checklists } = useInterviews();
-  const { isDemoMode, isSupabaseConfigured } = useAuth();
+  const { isSupabaseConfigured } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -53,24 +53,9 @@ export const DocumentsView: React.FC<{ onOpenInterview: (id: string) => void }> 
 
   const handleDownloadOrView = async (doc: DocumentItem & { interview_id: string }) => {
     const fileRef = doc.file_url || doc.storage_path;
-    if (!fileRef) return;
+    if (!fileRef || fileRef.startsWith('#')) return;
 
     const docKey = `${doc.interview_id}-${doc.item_number}`;
-
-    // Intercept Demo mode
-    if (
-      !isSupabaseConfigured ||
-      isDemoMode ||
-      fileRef.startsWith('#demo-') ||
-      fileRef.startsWith('#')
-    ) {
-      setActionToast({
-        type: 'info',
-        message: 'Demo Mode – file metadata saved only. Binary content is not persisted.',
-        submessage: `Document "${doc.file_name || doc.document_title}" is tracked as metadata in this offline demo session.`,
-      });
-      return;
-    }
 
     try {
       setActiveRetrievalKey(docKey);
@@ -270,17 +255,9 @@ export const DocumentsView: React.FC<{ onOpenInterview: (id: string) => void }> 
                             {doc.file_name || 'Attached Evidence'}
                           </span>
                         </div>
-                        {(!isSupabaseConfigured ||
-                          isDemoMode ||
-                          (doc.file_url && doc.file_url.startsWith('#demo-'))) ? (
-                          <span className="text-[9px] font-semibold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded shrink-0">
-                            Demo Metadata
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-semibold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded shrink-0">
-                            Vault
-                          </span>
-                        )}
+                        <span className="text-[9px] font-semibold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded shrink-0">
+                          Vault
+                        </span>
                       </div>
 
                       <button
@@ -415,13 +392,6 @@ export const DocumentsView: React.FC<{ onOpenInterview: (id: string) => void }> 
                               )}
                               <span>Download / View</span>
                             </button>
-                            {(!isSupabaseConfigured ||
-                              isDemoMode ||
-                              (doc.file_url && doc.file_url.startsWith('#demo-'))) && (
-                              <span className="text-[9px] font-semibold text-amber-800 bg-amber-100 px-1 py-0.2 rounded">
-                                Demo
-                              </span>
-                            )}
                           </div>
                         </div>
                       ) : (

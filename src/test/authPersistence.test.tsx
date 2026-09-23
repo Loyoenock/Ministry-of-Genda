@@ -20,13 +20,13 @@ vi.mock('../lib/supabase', async (importOriginal) => {
 });
 
 function TestConsumer() {
-  const { allUsers, updateUserRole, authError, demoLogin } = useAuth();
+  const { allUsers, updateUserRole, authError, switchRole } = useAuth();
   return (
     <div>
       <div data-testid="user-role">
         {allUsers.find(u => u.id === 'usr-charles-003')?.role}
       </div>
-      <button data-testid="login-admin" onClick={() => demoLogin('admin')}>
+      <button data-testid="login-admin" onClick={() => switchRole('admin')}>
         Login Admin
       </button>
       <button data-testid="update-btn" onClick={async () => await updateUserRole('usr-charles-003', 'admin')}>

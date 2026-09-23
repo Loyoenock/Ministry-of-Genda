@@ -40,7 +40,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
   onUpdateChecklistItem,
   onUploadDocumentFile,
 }) => {
-  const { isDemoMode, isSupabaseConfigured } = useAuth();
+  const { isSupabaseConfigured } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const targetUploadItemRef = useRef<number | null>(null);
 
@@ -72,19 +72,11 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
 
     try {
       await onUploadDocumentFile(interviewId, targetItem, file);
-      if (!isSupabaseConfigured || isDemoMode) {
-        setActionToast({
-          type: 'info',
-          message: 'Demo Mode – file metadata saved only. Binary content is not persisted.',
-          submessage: `Attached metadata for "${file.name}" on checklist item #${targetItem}.`,
-        });
-      } else {
-        setActionToast({
-          type: 'success',
-          message: `File uploaded successfully: "${file.name}"`,
-          submessage: 'Securely stored in private bucket "interview-documents" with 1-hour signed access.',
-        });
-      }
+      setActionToast({
+        type: 'success',
+        message: `File uploaded successfully: "${file.name}"`,
+        submessage: 'Securely stored in private bucket "interview-documents" with 1-hour signed access.',
+      });
     } catch (err: any) {
       const errMsg = err?.message || 'An unexpected error occurred during document upload.';
       setActionToast({
@@ -99,22 +91,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
 
   const handleDownloadOrView = async (item: DocumentItem) => {
     const fileRef = item.file_url || item.storage_path;
-    if (!fileRef) return;
-
-    // Demo mode interception
-    if (
-      !isSupabaseConfigured ||
-      isDemoMode ||
-      fileRef.startsWith('#demo-') ||
-      fileRef.startsWith('#')
-    ) {
-      setActionToast({
-        type: 'info',
-        message: 'Demo Mode – file metadata saved only. Binary content is not persisted.',
-        submessage: `File "${item.file_name || 'Document'}" was recorded as an offline metadata entry in this session.`,
-      });
-      return;
-    }
+    if (!fileRef || fileRef.startsWith('#')) return;
 
     try {
       setActiveRetrievalItem(item.item_number);
@@ -151,30 +128,6 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
         aria-label="Upload document file"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.csv,.txt"
       />
-
-      {/* Demo Mode Notice Banner */}
-      {(!isSupabaseConfigured || isDemoMode) && (
-        <div
-          role="status"
-          className="bg-amber-500/10 border border-amber-500/30 text-amber-950 p-4 rounded-2xl flex items-start gap-3 text-xs shadow-2xs animate-in fade-in duration-200"
-        >
-          <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-amber-900">Demo Mode Active</span>
-              <span className="bg-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                Metadata Only
-              </span>
-            </div>
-            <p className="text-amber-900/90 leading-relaxed font-medium">
-              Demo Mode – file metadata saved only. Binary content is not persisted.
-            </p>
-            <p className="text-amber-800 text-[11px]">
-              Uploaded file names and collection states are tracked locally in this session, avoiding browser storage quotas.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Notification Toast / Alert */}
       {actionToast && (
@@ -468,18 +421,10 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
 
                         {/* Metadata badge and Download / View button */}
                         <div className="flex items-center justify-between gap-2 pt-1 border-t border-emerald-200/70">
-                          {(!isSupabaseConfigured ||
-                            isDemoMode ||
-                            (item.file_url && item.file_url.startsWith('#demo-'))) ? (
-                            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded">
-                              Demo Mode – Metadata only
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded flex items-center gap-1">
-                              <FileCheck className="w-3 h-3 text-emerald-700" />
-                              Private Vault
-                            </span>
-                          )}
+                          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded flex items-center gap-1">
+                            <FileCheck className="w-3 h-3 text-emerald-700" />
+                            Private Vault
+                          </span>
 
                           <button
                             type="button"
