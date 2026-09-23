@@ -65,7 +65,9 @@ export function mapSignInError(error: any): MappedAuthError {
   if (
     rawMessage.includes('email not confirmed') ||
     rawMessage.includes('not verified') ||
-    rawMessage.includes('email_not_confirmed')
+    rawMessage.includes('email_not_confirmed') ||
+    rawMessage.includes('confirm') ||
+    rawMessage.includes('verify')
   ) {
     return {
       message: 'Please confirm your email before signing in. Check your inbox for the confirmation link.',

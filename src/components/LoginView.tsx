@@ -19,7 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { validateEmail, validatePassword, validateFullName } from '../lib/validation';
-import { AuthErrorCode, mapSignUpError } from '../lib/authErrorMapper';
+import { AuthErrorCode } from '../lib/authErrorMapper';
 import { supabase } from '../lib/supabase';
 
 export const LoginView: React.FC = () => {
@@ -33,15 +33,38 @@ export const LoginView: React.FC = () => {
   const [department, setDepartment] = useState('Labour Directorate');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [resendStatus, setResendStatus] = useState<string | null>(null);
 
   // Authentication feedback banners
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
+
+  const handleResendConfirmation = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage('Please enter your email address above to resend confirmation.');
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: trimmedEmail,
+      });
+      if (error) {
+        setErrorMessage(error.message || 'Failed to resend confirmation email.');
+      } else {
+        setSuccessMessage('Confirmation email re-sent successfully. Please check your inbox.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to resend confirmation email.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Field validation and touched states
   const [touched, setTouched] = useState<{
@@ -143,8 +166,6 @@ export const LoginView: React.FC = () => {
     setErrorMessage(null);
     setErrorCode(null);
     setSuccessMessage(null);
-    setNeedsConfirmation(false);
-    setResendStatus(null);
     setFieldErrors({});
     setTouched({});
 
@@ -162,8 +183,6 @@ export const LoginView: React.FC = () => {
     setMode('signin');
     setErrorMessage(null);
     setErrorCode(null);
-    setNeedsConfirmation(false);
-    setResendStatus(null);
     setFieldErrors({});
     setTouched({});
     setTimeout(() => {
@@ -171,35 +190,11 @@ export const LoginView: React.FC = () => {
     }, 100);
   };
 
-  const handleResendConfirmation = async () => {
-    if (!email.trim()) return;
-    setIsResending(true);
-    setResendStatus(null);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email.trim(),
-      });
-      if (error) {
-        const mapped = mapSignUpError(error);
-        setResendStatus(mapped.message);
-      } else {
-        setResendStatus('Confirmation email resent successfully! Please check your inbox.');
-      }
-    } catch (err: any) {
-      setResendStatus('Failed to resend confirmation email. Please try again.');
-    } finally {
-      setIsResending(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setErrorCode(null);
     setSuccessMessage(null);
-    setNeedsConfirmation(false);
-    setResendStatus(null);
 
     // Mark fields as touched
     setTouched({
@@ -245,7 +240,7 @@ export const LoginView: React.FC = () => {
           setErrorCode(code || null);
         }
       } else {
-        const { error, needsConfirmation: isConfirmRequired, code } = await signUp(
+        const { error, needsConfirmation, code } = await signUp(
           email,
           password,
           fullName,
@@ -256,12 +251,11 @@ export const LoginView: React.FC = () => {
             error.message || 'Registration could not be completed. Please try again.'
           );
           setErrorCode(code || null);
-          setNeedsConfirmation(false);
-        } else if (isConfirmRequired) {
-          setNeedsConfirmation(true);
-          setSuccessMessage(null);
+        } else if (needsConfirmation) {
+          setSuccessMessage(
+            'Account created successfully. Please check your inbox to confirm your email before signing in.'
+          );
         } else {
-          setNeedsConfirmation(false);
           setSuccessMessage(
             'Account registered successfully! Welcome to the MGLSD Diagnostic workspace.'
           );
@@ -394,6 +388,20 @@ export const LoginView: React.FC = () => {
                         </button>
                       </div>
                     )}
+                    {errorCode === 'EMAIL_NOT_CONFIRMED' && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          data-testid="resend-confirmation-btn"
+                          onClick={handleResendConfirmation}
+                          disabled={isSubmitting}
+                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg font-bold text-[11px] transition shadow-xs disabled:opacity-50"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>Resend confirmation email</span>
+                        </button>
+                      </div>
+                    )}
                     {errorCode === 'NETWORK_ERROR' && (
                       <div className="pt-2">
                         <button
@@ -411,69 +419,8 @@ export const LoginView: React.FC = () => {
               </div>
             )}
 
-            {/* Confirmation Required Panel */}
-            {needsConfirmation && (
-              <div
-                id="login-confirmation-panel"
-                data-testid="login-confirmation-panel"
-                className="p-5 bg-teal-50 border-2 border-teal-300 text-teal-900 rounded-2xl space-y-4 shadow-md animate-in fade-in"
-              >
-                <div className="flex items-start space-x-3">
-                  <Mail className="w-6 h-6 shrink-0 text-teal-700 mt-0.5" />
-                  <div className="space-y-1 flex-1">
-                    <h3 className="text-sm font-black tracking-tight text-teal-950">
-                      Confirm your email to activate your account
-                    </h3>
-                    <p className="text-xs text-teal-800 leading-relaxed">
-                      We created your account for <span className="font-bold underline">{email}</span>. Open the confirmation link we sent, then sign in here. Check spam/junk if you do not see the email within a few minutes.
-                    </p>
-                  </div>
-                </div>
-
-                {resendStatus && (
-                  <p className="text-xs font-semibold text-teal-900 bg-teal-100/80 p-2.5 rounded-xl">
-                    {resendStatus}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('signin');
-                      setNeedsConfirmation(false);
-                      setSuccessMessage(null);
-                    }}
-                    className="flex-1 py-2.5 px-4 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-xs"
-                  >
-                    <span>Proceed to Sign In</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleResendConfirmation}
-                    disabled={isResending}
-                    className="py-2.5 px-4 bg-white hover:bg-teal-100/60 text-teal-800 border border-teal-300 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 disabled:opacity-50 shadow-xs"
-                  >
-                    {isResending ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-teal-700/30 border-t-teal-700 rounded-full animate-spin" />
-                        <span>Resending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Resend Confirmation</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Success message banner */}
-            {successMessage && (!needsConfirmation) && (
+            {successMessage && (
               <div
                 id="login-success-alert"
                 data-testid="login-success-alert"

@@ -161,27 +161,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (insertErr) {
           console.error('[profiles] insert failed', insertErr);
-          if (insertErr.code === '23505' || insertErr.message?.includes('duplicate key') || insertErr.message?.includes('conflict')) {
-            const { data: existingRow } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', authUser.id)
-              .maybeSingle();
-            if (existingRow) {
-              const mappedRole = (existingRow.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
-              const profile: UserProfile = {
-                id: existingRow.id,
-                email: existingRow.email,
-                full_name: existingRow.full_name,
-                role: mappedRole,
-                department_unit: existingRow.department_unit || 'Labour Directorate',
-                phone_number: existingRow.phone_number || undefined,
-                avatar_url: existingRow.avatar_url || undefined,
-              };
-              setCurrentUser(profile);
-              setActualRole(mappedRole);
-              setActiveRole(mappedRole);
-            }
+          // Re-select row in case trigger won the race or row already exists
+          const { data: retryRow } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          if (retryRow) {
+            const mappedRole = (retryRow.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
+            const profile: UserProfile = {
+              id: retryRow.id,
+              email: retryRow.email,
+              full_name: retryRow.full_name,
+              role: mappedRole,
+              department_unit: retryRow.department_unit || 'Labour Directorate',
+              phone_number: retryRow.phone_number || undefined,
+              avatar_url: retryRow.avatar_url || undefined,
+            };
+            setCurrentUser(profile);
+            setActualRole(mappedRole);
+            setActiveRole(mappedRole);
+          } else {
+            setCurrentUser(newProfile);
+            setActualRole(newProfile.role);
+            setActiveRole(newProfile.role);
           }
         } else {
           setCurrentUser(newProfile);
@@ -210,6 +214,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('Error in fetchOrCreateProfile:', err);
+      if (authUser) {
+        const fallbackProfile: UserProfile = {
+          id: authUser.id,
+          email: authUser.email || '',
+          full_name: authUser.user_metadata?.full_name || 'Labour Officer',
+          role: 'interviewer',
+          department_unit: authUser.user_metadata?.department_unit || 'Labour Directorate',
+        };
+        setCurrentUser(fallbackProfile);
+      }
     } finally {
       setLoading(false);
     }
@@ -359,9 +373,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error: new Error(mapped.message), code: mapped.code };
       }
 
-      if (data.user) {
-        await fetchOrCreateProfile(data.user);
+      if (!data.session || !data.user) {
+        setLoading(false);
+        const err = new Error('Sign-in succeeded but no session was established. Please try again or contact support.');
+        setAuthError(err.message);
+        return { error: err, code: 'INVALID_CREDENTIALS' };
       }
+
+      try {
+        await fetchOrCreateProfile(data.user);
+      } catch (profileErr) {
+        console.error('fetchOrCreateProfile error during login:', profileErr);
+      }
+
+      if (data.user) {
+        const minimalProfile: UserProfile = {
+          id: data.user.id,
+          email: data.user.email || trimmedEmail,
+          full_name: data.user.user_metadata?.full_name || 'Labour Officer',
+          role: 'interviewer',
+          department_unit: data.user.user_metadata?.department_unit || 'Labour Directorate',
+        };
+        setCurrentUser((prev) => prev || minimalProfile);
+      }
+
+      setLoading(false);
       setAuthError(null);
       return { error: null };
     } catch (err: any) {
@@ -432,6 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        setLoading(false);
         const mapped = mapSignUpError(error);
         setAuthError(mapped.message);
         return { error: new Error(mapped.message), code: mapped.code };
@@ -440,6 +477,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Supabase duplicate email detection when email confirmation is enabled:
       // Supabase returns an obfuscated user object with an empty identities array []
       if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setLoading(false);
         const msg = 'An account with this email already exists. Please sign in instead.';
         setAuthError(msg);
         return {
@@ -456,18 +494,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: null, needsConfirmation: false };
         } else {
           // Confirmation email was sent; user needs to confirm
+          setLoading(false);
           setAuthError(null);
           return { error: null, needsConfirmation: true };
         }
       }
 
+      setLoading(false);
       return { error: null, needsConfirmation: true };
     } catch (err: any) {
+      setLoading(false);
       const mapped = mapSignUpError(err);
       setAuthError(mapped.message);
       return { error: new Error(mapped.message), code: mapped.code };
-    } finally {
-      setLoading(false);
     }
   };
 
