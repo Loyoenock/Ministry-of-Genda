@@ -13,26 +13,36 @@ interface NewInterviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   onInterviewCreated: (interview: Interview) => void;
+  initialDate?: string;
 }
 
 export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
   isOpen,
   onClose,
   onInterviewCreated,
+  initialDate,
 }) => {
   const { user, allUsers, isAdmin } = useAuth();
   const { createInterview } = useInterviews();
+
+  const todayIso = new Date().toISOString().split('T')[0];
 
   const [intervieweeName, setIntervieweeName] = useState('');
   const [roleTitle, setRoleTitle] = useState('');
   const [departmentUnit, setDepartmentUnit] = useState('Labour Directorate');
   const [yearsInRole, setYearsInRole] = useState('2.5');
   const [tier, setTier] = useState<InterviewTier>('Management');
-  const [interviewDate, setInterviewDate] = useState('16 Sep 2025');
+  const [interviewDate, setInterviewDate] = useState(initialDate || todayIso);
   const [interviewTime, setInterviewTime] = useState('10:00 AM');
   const [location, setLocation] = useState('Ministry Headquarters, Kampala');
   const [assignedInterviewerId, setAssignedInterviewerId] = useState(user?.id || 'usr-john-okello-001');
   const [validationError, setValidationError] = useState('');
+
+  React.useEffect(() => {
+    if (initialDate) {
+      setInterviewDate(initialDate);
+    }
+  }, [initialDate, isOpen]);
 
   if (!isOpen) return null;
 
@@ -254,10 +264,10 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
               <div>
                 <label className="block text-xs text-slate-600 font-medium mb-1">Date</label>
                 <input
-                  type="text"
+                  type="date"
                   value={interviewDate}
                   onChange={(e) => setInterviewDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px]"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none min-h-[42px] bg-white"
                 />
               </div>
 

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useInterviews } from '../context/InterviewContext';
@@ -37,6 +37,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [tierFilter, setTierFilter] = useState<string>('All Tiers');
   const [statusFilter, setStatusFilter] = useState<string>('All Statuses');
   const [selectedInterviewIds, setSelectedInterviewIds] = useState<string[]>([]);
+  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const dateFormatted = currentDateTime.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const timeFormatted = currentDateTime.toLocaleTimeString('en-GB', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
 
   // Compute dynamic metric metrics
   const totalInterviews = interviews.length;
@@ -135,8 +156,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Calendar className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-800">Tue, 16 Sep 2025</p>
-            <p className="text-[11px] text-slate-400">Last updated: 10:24 AM</p>
+            <p className="text-xs font-bold text-slate-800">{dateFormatted}</p>
+            <p className="text-[11px] text-slate-400">Live: {timeFormatted}</p>
           </div>
         </div>
       </div>

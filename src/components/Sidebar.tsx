@@ -16,6 +16,7 @@ import {
   Users,
   Layers,
   X,
+  CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -62,6 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'interviews', label: 'Interviews', icon: ClipboardList },
+    { id: 'calendar', label: 'Schedule & Calendar', icon: CalendarDays },
     {
       id: 'new-interview',
       label: 'New Interview',

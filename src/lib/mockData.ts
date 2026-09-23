@@ -270,32 +270,6 @@ export const INITIAL_RECENT_ACTIVITIES: RecentActivityItem[] = [
   },
 ];
 
-export const UPCOMING_SCHEDULE = [
-  {
-    id: 'sch-1',
-    department: 'Labour Directorate',
-    datetime: '16 Sep 2025 • 2:30 PM',
-    tier: 'Management',
-  },
-  {
-    id: 'sch-2',
-    department: 'Employment Services',
-    datetime: '17 Sep 2025 • 10:00 AM',
-    tier: 'Frontline',
-  },
-  {
-    id: 'sch-3',
-    department: 'Ministry of Gender',
-    datetime: '18 Sep 2025 • 9:00 AM',
-    tier: 'Leadership',
-  },
-  {
-    id: 'sch-4',
-    department: 'Labour Department',
-    datetime: '19 Sep 2025 • 11:30 AM',
-    tier: 'Support/IT',
-  },
-];
 
 export function createInitialChecklist(interviewId: string): DocumentItem[] {
   return STATUTORY_DOCUMENTS_CATALOGUE.map((doc, idx) => ({

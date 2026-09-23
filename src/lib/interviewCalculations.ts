@@ -70,3 +70,17 @@ export function calculateSectionProgress(
 export function countCollectedDocuments(checklist: DocumentItem[]): number {
   return checklist.filter((item) => item.collected_status === 'Collected').length;
 }
+
+/**
+ * Parses interview date string (supports ISO YYYY-MM-DD or human formats like '16 Sep 2025') into a Date object safely.
+ */
+export function parseInterviewDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+

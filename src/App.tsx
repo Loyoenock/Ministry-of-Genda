@@ -16,6 +16,7 @@ import { UserManagementView } from './components/UserManagementView';
 import { DocumentsView } from './components/DocumentsView';
 import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
+import { CalendarView } from './components/calendar/CalendarView';
 import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
 import { SupabaseConfigErrorView } from './components/SupabaseConfigErrorView';
@@ -27,6 +28,7 @@ function MainLayout() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [activeInterviewId, setActiveInterviewId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [newInterviewDate, setNewInterviewDate] = useState<string | undefined>(undefined);
   const [exportInterviewId, setExportInterviewId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -77,6 +79,7 @@ function MainLayout() {
             setMobileNavOpen(false);
           }}
           onOpenNewInterview={() => {
+            setNewInterviewDate(undefined);
             setShowNewModal(true);
             setMobileNavOpen(false);
           }}
@@ -97,7 +100,10 @@ function MainLayout() {
               {activeTab === 'dashboard' && (
                 <DashboardView
                   onOpenInterview={handleOpenInterview}
-                  onOpenNewInterview={() => setShowNewModal(true)}
+                  onOpenNewInterview={() => {
+                    setNewInterviewDate(undefined);
+                    setShowNewModal(true);
+                  }}
                   onNavigate={(tab) => setActiveTab(tab)}
                 />
               )}
@@ -105,8 +111,21 @@ function MainLayout() {
               {activeTab === 'interviews' && (
                 <DashboardView
                   onOpenInterview={handleOpenInterview}
-                  onOpenNewInterview={() => setShowNewModal(true)}
+                  onOpenNewInterview={() => {
+                    setNewInterviewDate(undefined);
+                    setShowNewModal(true);
+                  }}
                   onNavigate={(tab) => setActiveTab(tab)}
+                />
+              )}
+
+              {activeTab === 'calendar' && (
+                <CalendarView
+                  onOpenInterview={handleOpenInterview}
+                  onOpenNewInterviewWithDate={(dateStr) => {
+                    setNewInterviewDate(dateStr);
+                    setShowNewModal(true);
+                  }}
                 />
               )}
 
@@ -117,7 +136,10 @@ function MainLayout() {
               {activeTab === 'notes' && (
                 <DashboardView
                   onOpenInterview={handleOpenInterview}
-                  onOpenNewInterview={() => setShowNewModal(true)}
+                  onOpenNewInterview={() => {
+                    setNewInterviewDate(undefined);
+                    setShowNewModal(true);
+                  }}
                   onNavigate={(tab) => setActiveTab(tab)}
                 />
               )}
@@ -145,7 +167,11 @@ function MainLayout() {
       {/* New Interview Wizard Modal */}
       <NewInterviewModal
         isOpen={showNewModal}
-        onClose={() => setShowNewModal(false)}
+        initialDate={newInterviewDate}
+        onClose={() => {
+          setShowNewModal(false);
+          setNewInterviewDate(undefined);
+        }}
         onInterviewCreated={handleInterviewCreated}
       />
 
