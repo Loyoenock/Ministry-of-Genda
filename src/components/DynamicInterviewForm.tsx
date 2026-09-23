@@ -30,7 +30,6 @@ import { QuestionnaireTab } from './interview-form/QuestionnaireTab';
 import { DocumentsTab } from './interview-form/DocumentsTab';
 import { NotesTab } from './interview-form/NotesTab';
 import { useAuth } from '../context/AuthContext';
-import { removeDemoStorageEntriesForInterview } from '../lib/interviewService';
 
 interface DynamicInterviewFormProps {
   interviewId: string;
@@ -160,7 +159,6 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     setIsDeleting(true);
     try {
       deleteInterview(interview.id);
-      removeDemoStorageEntriesForInterview(interview.id);
       setDeleteModalOpen(false);
       onBack();
     } catch (err: any) {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -12,7 +12,40 @@ import { InterviewProvider, useInterviews } from '../context/InterviewContext';
 // Helper component to test Auth & RLS behavior
 function TestAuthConsumer() {
   const { user, role, switchRole } = useAuth();
-  const { interviews, allInterviewsGlobal } = useInterviews();
+  const { interviews, allInterviewsGlobal, createInterview } = useInterviews();
+
+  useEffect(() => {
+    if (allInterviewsGlobal.length === 0) {
+      createInterview({
+        interviewee_name: 'Assigned Participant',
+        role_title: 'Director',
+        department_unit: 'Labour Unit',
+        years_in_role: 3,
+        interview_date: '2025-09-16',
+        interview_time: '11:00 AM',
+        location: 'Kampala',
+        interviewer_id: 'usr-john-okello-001',
+        interviewer_name: 'John Okello',
+        tier: 'Leadership',
+        status: 'Draft',
+        duration_min: 60,
+      });
+      createInterview({
+        interviewee_name: 'Other Participant',
+        role_title: 'Manager',
+        department_unit: 'OSH',
+        years_in_role: 2,
+        interview_date: '2025-09-17',
+        interview_time: '2:00 PM',
+        location: 'Entebbe',
+        interviewer_id: 'usr-other-interviewer-999',
+        interviewer_name: 'Other Interviewer',
+        tier: 'Management',
+        status: 'Draft',
+        duration_min: 60,
+      });
+    }
+  }, [allInterviewsGlobal.length, createInterview]);
 
   return (
     <div>
@@ -56,9 +89,11 @@ describe('Authentication & Row Level Security (RLS)', () => {
     const visibleCount = parseInt(screen.getByTestId('visible-count').textContent || '0');
     const globalCount = parseInt(screen.getByTestId('global-count').textContent || '0');
 
-    // John Okello has 4 interviews assigned out of the 6 total in mockData
+    // John Okello only sees 1 assigned interview out of 2 created
     expect(visibleCount).toBeLessThanOrEqual(globalCount);
     expect(visibleCount).toBeGreaterThan(0);
+    expect(visibleCount).toBe(1);
+    expect(globalCount).toBe(2);
   });
 
   it('switches role to Admin and grants visibility to all interviews', () => {
@@ -79,6 +114,7 @@ describe('Authentication & Row Level Security (RLS)', () => {
     const visibleCountAfter = parseInt(screen.getByTestId('visible-count').textContent || '0');
     const globalCount = parseInt(screen.getByTestId('global-count').textContent || '0');
     expect(visibleCountAfter).toBe(globalCount);
+    expect(visibleCountAfter).toBe(2);
   });
 
   it('renders safely when user logs out and is unauthenticated (user is null)', async () => {

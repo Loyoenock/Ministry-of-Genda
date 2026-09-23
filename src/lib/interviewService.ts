@@ -321,55 +321,6 @@ export async function completeInterviewInSupabase(
 }
 
 /**
- * Remove local storage entries for an interview in demo mode or offline cache
- */
-export function removeDemoStorageEntriesForInterview(interviewId: string): void {
-  try {
-    // 1. Remove from mglsd_interviews
-    const savedInterviews = localStorage.getItem('mglsd_interviews');
-    if (savedInterviews) {
-      const parsed = JSON.parse(savedInterviews);
-      if (Array.isArray(parsed)) {
-        const filtered = parsed.filter((it: any) => it.id !== interviewId);
-        localStorage.setItem('mglsd_interviews', JSON.stringify(filtered));
-      }
-    }
-
-    // 2. Remove from mglsd_answers
-    const savedAnswers = localStorage.getItem('mglsd_answers');
-    if (savedAnswers) {
-      const parsed = JSON.parse(savedAnswers);
-      if (parsed && typeof parsed === 'object') {
-        delete parsed[interviewId];
-        localStorage.setItem('mglsd_answers', JSON.stringify(parsed));
-      }
-    }
-
-    // 3. Remove from mglsd_checklists
-    const savedChecklists = localStorage.getItem('mglsd_checklists');
-    if (savedChecklists) {
-      const parsed = JSON.parse(savedChecklists);
-      if (parsed && typeof parsed === 'object') {
-        delete parsed[interviewId];
-        localStorage.setItem('mglsd_checklists', JSON.stringify(parsed));
-      }
-    }
-
-    // 4. Remove from mglsd_notes
-    const savedNotes = localStorage.getItem('mglsd_notes');
-    if (savedNotes) {
-      const parsed = JSON.parse(savedNotes);
-      if (parsed && typeof parsed === 'object') {
-        delete parsed[interviewId];
-        localStorage.setItem('mglsd_notes', JSON.stringify(parsed));
-      }
-    }
-  } catch (err) {
-    console.warn('Notice: Error clearing demo localStorage entries:', err);
-  }
-}
-
-/**
  * Fetch answers for a given interview
  */
 export async function fetchAnswersFromSupabase(interviewId: string): Promise<Answer[]> {
@@ -461,15 +412,15 @@ export async function fetchOrInitChecklistFromSupabase(
     }
 
     // Auto-seed initial 20 statutory documents in DB if none found
-    const initialRows = STATUTORY_DOCUMENTS_CATALOGUE.map((doc, idx) => ({
+    const initialRows = STATUTORY_DOCUMENTS_CATALOGUE.map((doc) => ({
       interview_id: interviewId,
       item_number: doc.item_number,
       document_title: doc.document_title,
       category: doc.category,
-      exists_status: idx < 5 ? 'Yes' : idx < 10 ? 'Partial' : 'Unknown',
-      collected_status: idx < 3 ? 'Collected' : 'Pending',
-      notes: idx === 0 ? 'Verified 2020-2025 strategic document from Registry.' : '',
-      follow_up_action: idx >= 3 && idx < 6 ? 'Requested official copy from Commissioner OSH.' : '',
+      exists_status: 'Unknown',
+      collected_status: 'Pending',
+      notes: '',
+      follow_up_action: '',
       file_url: null,
     }));
 

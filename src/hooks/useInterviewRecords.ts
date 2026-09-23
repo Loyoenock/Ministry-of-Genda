@@ -5,8 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Interview, RecentActivityItem } from '../types';
-import { INITIAL_INTERVIEWS, INITIAL_RECENT_ACTIVITIES } from '../lib/mockData';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   isUuid,
   generateUuid,
@@ -30,96 +29,17 @@ export function useInterviewRecords({
   onInterviewCreated,
   onInterviewSelected,
 }: UseInterviewRecordsOptions) {
-  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
-
-  const [allInterviews, setAllInterviews] = useState<Interview[]>(() => {
-    // In test environment, keep mock data for unit tests
-    if (isTestEnv) {
-      return INITIAL_INTERVIEWS;
-    }
-    // When Supabase is configured, prefer real database and never seed with mock demo interviews
-    if (isSupabaseConfigured) {
-      const saved = localStorage.getItem('mglsd_interviews');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            // Only keep real UUID interviews, purge mock demo items
-            const realOnly = parsed.filter((it: Interview) => isUuid(it.id));
-            if (realOnly.length > 0) return realOnly;
-          }
-        } catch {
-          // ignore parse error
-        }
-      }
-      return [];
-    }
-    // In pure demo mode, read saved demo interviews or fall back to INITIAL_INTERVIEWS
-    const saved = localStorage.getItem('mglsd_interviews');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_INTERVIEWS;
-  });
-
+  // Pure Supabase-driven interviews state; single source of truth
+  const [allInterviews, setAllInterviews] = useState<Interview[]>([]);
   const [activeInterviewId, setActiveInterviewId] = useState<string | null>(null);
-
-  const [recentActivities, setRecentActivities] = useState<RecentActivityItem[]>(() => {
-    if (isTestEnv) {
-      return INITIAL_RECENT_ACTIVITIES;
-    }
-    if (isSupabaseConfigured) {
-      return [];
-    }
-    const saved = localStorage.getItem('mglsd_activities');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_RECENT_ACTIVITIES;
-  });
-
+  const [sessionActivities, setSessionActivities] = useState<RecentActivityItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      if (isSupabaseConfigured) {
-        const realOnly = allInterviews.filter((it) => isUuid(it.id));
-        if (realOnly.length > 0) {
-          localStorage.setItem('mglsd_interviews', JSON.stringify(realOnly));
-        } else {
-          localStorage.removeItem('mglsd_interviews');
-        }
-      } else {
-        localStorage.setItem('mglsd_interviews', JSON.stringify(allInterviews));
-      }
-    } catch {
-      // quota or private mode guard
-    }
-  }, [allInterviews]);
-
-  useEffect(() => {
-    try {
-      if (!isSupabaseConfigured) {
-        localStorage.setItem('mglsd_activities', JSON.stringify(recentActivities));
-      }
-    } catch {
-      // quota guard
-    }
-  }, [recentActivities]);
-
-  // Primary data loader: Fetches user's interviews (or all if admin) from Supabase
+  // Primary data loader: Fetches user's interviews (or all if admin) directly from Supabase
   const loadInterviews = useCallback(async () => {
     if (!isSupabaseConfigured) {
+      setError('Database configuration missing. Please connect Supabase.');
       return;
     }
 
@@ -133,19 +53,68 @@ export function useInterviewRecords({
       } else if (userId) {
         const userList = await fetchInterviewsFromSupabase(userId, false);
         setAllInterviews(userList);
+      } else {
+        const allList = await fetchInterviewsFromSupabase();
+        setAllInterviews(allList);
       }
     } catch (err: any) {
-      console.warn('Notice: Supabase interviews sync error:', err);
-      setError(err?.message || 'Could not connect to database');
+      console.error('Supabase interviews fetch failed:', err);
+      setError(err?.message || 'Failed to load interviews from Supabase database.');
     } finally {
       setLoading(false);
     }
   }, [userId, isAdmin]);
 
-  // Load interviews when auth state changes
+  // Load interviews on auth state change
   useEffect(() => {
     loadInterviews();
   }, [loadInterviews]);
+
+  // Supabase Realtime subscription: keep interviews synchronized across tabs and users
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel('realtime:public:interviews')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'interviews' },
+        () => {
+          loadInterviews();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadInterviews]);
+
+  // Derived real activities: combines live session actions with real Supabase interview records
+  const recentActivities = useMemo(() => {
+    const interviewActivities: RecentActivityItem[] = allInterviews.slice(0, 5).map((it) => {
+      const isCompleted = it.status === 'Completed';
+      return {
+        id: `act-${it.id}`,
+        description: isCompleted
+          ? `Interview completed: ${it.interviewee_name} (${it.role_title})`
+          : `Interview scheduled: ${it.interviewee_name} (${it.department_unit})`,
+        timestamp: it.updated_at ? new Date(it.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+        type: isCompleted ? 'completed' : 'started',
+        interviewee: it.interviewee_name,
+        organisation: it.department_unit,
+      };
+    });
+
+    const combined = [...sessionActivities, ...interviewActivities];
+    // De-duplicate by id
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }).slice(0, 10);
+  }, [allInterviews, sessionActivities]);
 
   // RLS Visibility
   const visibleInterviews = useMemo(() => {
@@ -166,7 +135,7 @@ export function useInterviewRecords({
   }, [onInterviewSelected]);
 
   const addRecentActivity = useCallback((item: RecentActivityItem) => {
-    setRecentActivities((prev) => [item, ...prev.slice(0, 8)]);
+    setSessionActivities((prev) => [item, ...prev.slice(0, 7)]);
   }, []);
 
   const createInterview = useCallback(
@@ -202,11 +171,20 @@ export function useInterviewRecords({
         onInterviewCreated(newInterview);
       }
 
-      // Persist to Supabase if configured
-      if (isSupabaseConfigured && isUuid(newInterview.interviewer_id)) {
-        insertInterviewToSupabase(newInterview).catch((err) => {
-          console.warn('Notice: Background Supabase interview creation sync:', err);
-        });
+      // Persist to Supabase
+      if (isSupabaseConfigured) {
+        insertInterviewToSupabase(newInterview)
+          .then((inserted) => {
+            if (inserted) {
+              setAllInterviews((prev) =>
+                prev.map((it) => (it.id === newId ? inserted : it))
+              );
+            }
+          })
+          .catch((err) => {
+            console.error('Supabase interview creation failed:', err);
+            setError('Failed to persist new interview to database.');
+          });
       }
 
       return newInterview;
@@ -223,7 +201,8 @@ export function useInterviewRecords({
 
     if (isSupabaseConfigured && isUuid(id)) {
       updateInterviewInSupabase(id, updates).catch((err) => {
-        console.warn('Notice: Supabase interview update sync:', err);
+        console.error('Supabase interview update sync failed:', err);
+        setError('Failed to update interview in database.');
       });
     }
   }, []);
@@ -234,7 +213,8 @@ export function useInterviewRecords({
 
     if (isSupabaseConfigured && isUuid(id)) {
       deleteInterviewFromSupabase(id).catch((err) => {
-        console.warn('Notice: Supabase interview deletion sync:', err);
+        console.error('Supabase interview deletion sync failed:', err);
+        setError('Failed to delete interview from database.');
       });
     }
   }, []);

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { InterviewerNote } from '../types';
-import { INITIAL_INTERVIEWS, createInitialNotes } from '../lib/mockData';
+import { createInitialNotes } from '../lib/mockData';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { isUuid, fetchOrInitNotesFromSupabase, saveNotesToSupabase } from '../lib/interviewService';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
@@ -15,50 +15,11 @@ interface UseNotesStateOptions {
 }
 
 export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
-  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
-
-  const [notesMap, setNotesMap] = useState<Record<string, InterviewerNote>>(() => {
-    if (isTestEnv) {
-      const initial: Record<string, InterviewerNote> = {};
-      INITIAL_INTERVIEWS.forEach((it) => {
-        initial[it.id] = createInitialNotes(it.id);
-      });
-      return initial;
-    }
-    if (isSupabaseConfigured) {
-      const saved = localStorage.getItem('mglsd_notes');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const realNotes: Record<string, InterviewerNote> = {};
-          Object.keys(parsed).forEach((k) => {
-            if (isUuid(k)) {
-              realNotes[k] = parsed[k];
-            }
-          });
-          return realNotes;
-        } catch {
-          // ignore
-        }
-      }
-      return {};
-    }
-    const saved = localStorage.getItem('mglsd_notes');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    const initial: Record<string, InterviewerNote> = {};
-    INITIAL_INTERVIEWS.forEach((it) => {
-      initial[it.id] = createInitialNotes(it.id);
-    });
-    return initial;
-  });
+  // Pure Supabase-driven in-memory cache for active interview notes
+  const [notesMap, setNotesMap] = useState<Record<string, InterviewerNote>>({});
 
   const saveNotesTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingNotesSave = useRef<{ interviewId: string; updates: Partial<InterviewerNote> } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -68,25 +29,6 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
       }
     };
   }, []);
-
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      if (isSupabaseConfigured) {
-        const realOnly: Record<string, InterviewerNote> = {};
-        Object.keys(notesMap).forEach((k) => {
-          if (isUuid(k)) {
-            realOnly[k] = notesMap[k];
-          }
-        });
-        localStorage.setItem('mglsd_notes', JSON.stringify(realOnly));
-      } else {
-        localStorage.setItem('mglsd_notes', JSON.stringify(notesMap));
-      }
-    } catch {
-      // quota guard
-    }
-  }, [notesMap]);
 
   const getInterviewNotes = useCallback(
     (interviewId: string): InterviewerNote => {
@@ -108,6 +50,8 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
   const removeNotesForInterview = useCallback((interviewId: string) => {
     if (saveNotesTimer.current) {
       clearTimeout(saveNotesTimer.current);
+      saveNotesTimer.current = null;
+      pendingNotesSave.current = null;
     }
     setNotesMap((prev) => {
       const copy = { ...prev };
@@ -131,6 +75,31 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     }
   }, []);
 
+  const flushNotesSave = useCallback(async (interviewId?: string): Promise<void> => {
+    if (!pendingNotesSave.current) return;
+    if (interviewId && pendingNotesSave.current.interviewId !== interviewId) return;
+
+    if (saveNotesTimer.current) {
+      clearTimeout(saveNotesTimer.current);
+      saveNotesTimer.current = null;
+    }
+
+    const { interviewId: targetId, updates } = pendingNotesSave.current;
+    pendingNotesSave.current = null;
+
+    if (isSupabaseConfigured && isUuid(targetId)) {
+      try {
+        await saveNotesToSupabase(targetId, updates);
+        setAutoSaveStatus('saved');
+      } catch (err) {
+        setAutoSaveStatus('error');
+        throw err;
+      }
+    } else {
+      setAutoSaveStatus('saved');
+    }
+  }, [setAutoSaveStatus]);
+
   const saveNotes = useCallback(
     async (interviewId: string, updates: Partial<InterviewerNote>): Promise<void> => {
       setAutoSaveStatus('saving');
@@ -149,28 +118,33 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
         };
       });
 
+      pendingNotesSave.current = { interviewId, updates };
+
       if (saveNotesTimer.current) {
         clearTimeout(saveNotesTimer.current);
-        saveNotesTimer.current = null;
       }
 
-      if (isSupabaseConfigured && isUuid(interviewId)) {
-        try {
-          await saveNotesToSupabase(interviewId, updates);
-          setAutoSaveStatus('saved');
-        } catch (err) {
-          if (previousNote) {
-            setNotesMap((prev) => ({
-              ...prev,
-              [interviewId]: previousNote!,
-            }));
+      saveNotesTimer.current = setTimeout(async () => {
+        saveNotesTimer.current = null;
+        pendingNotesSave.current = null;
+
+        if (isSupabaseConfigured && isUuid(interviewId)) {
+          try {
+            await saveNotesToSupabase(interviewId, updates);
+            setAutoSaveStatus('saved');
+          } catch (err) {
+            if (previousNote) {
+              setNotesMap((prev) => ({
+                ...prev,
+                [interviewId]: previousNote!,
+              }));
+            }
+            setAutoSaveStatus('error');
           }
-          setAutoSaveStatus('error');
-          throw err;
+        } else {
+          setAutoSaveStatus('saved');
         }
-      } else {
-        setAutoSaveStatus('saved');
-      }
+      }, 500);
     },
     [setAutoSaveStatus]
   );
@@ -182,5 +156,6 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     removeNotesForInterview,
     loadNotesFromSupabase,
     saveNotes,
+    flushNotesSave,
   };
 }

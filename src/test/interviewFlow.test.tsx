@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -42,6 +42,46 @@ function TestInterviewCreation() {
   );
 }
 
+function DynamicFormTestHost({
+  onBack,
+  name = 'Sarah Nansubuga',
+  tier = 'Leadership',
+  initialStatus = 'In Progress',
+}: {
+  onBack: () => void;
+  name?: string;
+  tier?: 'Leadership' | 'Management' | 'Frontline' | 'Support/IT';
+  initialStatus?: 'Draft' | 'In Progress' | 'Completed';
+}) {
+  const { createInterview, interviews } = useInterviews();
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (interviews.length === 0) {
+      const interview = createInterview({
+        interviewee_name: name,
+        role_title: 'Permanent Secretary',
+        department_unit: 'Ministry of Gender',
+        years_in_role: 3.5,
+        interview_date: '16 Sep 2025',
+        interview_time: '10:15 AM',
+        location: 'Kampala',
+        interviewer_id: 'usr-john-okello-001',
+        interviewer_name: 'John Okello',
+        tier,
+        status: initialStatus,
+        duration_min: 75,
+      });
+      setCreatedId(interview.id);
+    } else {
+      setCreatedId(interviews[0].id);
+    }
+  }, [createInterview, initialStatus, interviews, name, tier]);
+
+  if (!createdId) return null;
+  return <DynamicInterviewForm interviewId={createdId} onBack={onBack} />;
+}
+
 describe('Interview Management & Dynamic Questionnaire Workflow', () => {
   it('creates an interview with proper tier routing and initialization', () => {
     render(
@@ -67,12 +107,11 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     render(
       <AuthProvider>
         <InterviewProvider>
-          <DynamicInterviewForm interviewId="int-001" onBack={() => {}} />
+          <DynamicFormTestHost onBack={() => {}} name="Sarah Nansubuga" tier="Leadership" />
         </InterviewProvider>
       </AuthProvider>
     );
 
-    // int-001 is Sarah Nansubuga, Leadership Tier
     expect(screen.getByText('Sarah Nansubuga')).toBeTruthy();
     expect(screen.getAllByText(/Tier: Leadership/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Diagnostic Questions/i).length).toBeGreaterThan(0);
@@ -82,7 +121,7 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     render(
       <AuthProvider>
         <InterviewProvider>
-          <DynamicInterviewForm interviewId="int-001" onBack={() => {}} />
+          <DynamicFormTestHost onBack={() => {}} />
         </InterviewProvider>
       </AuthProvider>
     );
@@ -110,7 +149,7 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     render(
       <AuthProvider>
         <InterviewProvider>
-          <DynamicInterviewForm interviewId="int-001" onBack={onBackMock} />
+          <DynamicFormTestHost onBack={onBackMock} />
         </InterviewProvider>
       </AuthProvider>
     );
@@ -143,7 +182,7 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     render(
       <AuthProvider>
         <InterviewProvider>
-          <DynamicInterviewForm interviewId="int-002" onBack={onBackMock} />
+          <DynamicFormTestHost onBack={onBackMock} />
         </InterviewProvider>
       </AuthProvider>
     );
@@ -177,5 +216,3 @@ describe('Interview Management & Dynamic Questionnaire Workflow', () => {
     expect(hqLink.getAttribute('href')).toBe('https://mglsd.go.ug');
   });
 });
-
-

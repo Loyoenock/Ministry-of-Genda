@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import {
   Interview,
   Answer,
@@ -22,7 +22,6 @@ import {
   isUuid,
   fetchOrInitChecklistFromSupabase,
   fetchOrInitNotesFromSupabase,
-  removeDemoStorageEntriesForInterview,
   completeInterviewInSupabase,
 } from '../lib/interviewService';
 
@@ -47,6 +46,8 @@ export interface InterviewContextType {
   updateInterview: (id: string, updates: Partial<Interview>) => void | Promise<void>;
   deleteInterview: (id: string) => void | Promise<void>;
   completeInterview: (id: string, completionPercentage: number) => Promise<void>;
+  flushAnswersSave: (interviewId: string) => Promise<void>;
+  flushNotesSave: (interviewId?: string) => Promise<void>;
   getInterviewAnswers: (interviewId: string) => Answer[];
   saveAnswer: (
     interviewId: string,
@@ -75,30 +76,6 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { user, isAdmin } = useAuth();
   const { autoSaveStatus, setAutoSaveStatus } = useAutoSaveStatus('saved');
 
-  // When connected to real Supabase with an active user, clear conflicting demo storage keys
-  useEffect(() => {
-    if (isSupabaseConfigured && user) {
-      try {
-        localStorage.removeItem('mglsd_demo_user');
-        localStorage.removeItem('mglsd_active_user_id');
-        const savedInterviews = localStorage.getItem('mglsd_interviews');
-        if (savedInterviews) {
-          const parsed = JSON.parse(savedInterviews);
-          if (Array.isArray(parsed) && parsed.some((it: any) => !isUuid(it.id))) {
-            const realOnly = parsed.filter((it: any) => isUuid(it.id));
-            if (realOnly.length > 0) {
-              localStorage.setItem('mglsd_interviews', JSON.stringify(realOnly));
-            } else {
-              localStorage.removeItem('mglsd_interviews');
-            }
-          }
-        }
-      } catch {
-        // quota or storage guard
-      }
-    }
-  }, [user]);
-
   // Sub-data managers initialized
   const checklistState = useChecklistState({
     userId: user?.id,
@@ -115,7 +92,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       notesState.initNotesForInterview(newInterview.id);
       answersState.initAnswersForInterview(newInterview.id);
 
-      if (isSupabaseConfigured && isUuid(newInterview.interviewer_id)) {
+      if (isSupabaseConfigured && isUuid(newInterview.id)) {
         fetchOrInitChecklistFromSupabase(newInterview.id)
           .then(() => fetchOrInitNotesFromSupabase(newInterview.id))
           .catch((err) => {
@@ -176,23 +153,31 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       answersState.removeAnswersForInterview(id);
       checklistState.removeChecklistForInterview(id);
       notesState.removeNotesForInterview(id);
-      removeDemoStorageEntriesForInterview(id);
     },
     [interviewRecords, answersState, checklistState, notesState]
   );
 
   const completeInterview = useCallback(
     async (id: string, completionPercentage: number) => {
-      await interviewRecords.updateInterview(id, {
+      // 1. Flush pending debounced answers and notes
+      await Promise.all([
+        answersState.flushAnswersSave(id),
+        notesState.flushNotesSave(id),
+      ]);
+
+      // 2. Persist completed state to Supabase database FIRST
+      if (isSupabaseConfigured && isUuid(id)) {
+        await completeInterviewInSupabase(id, completionPercentage);
+      }
+
+      // 3. Update local state
+      interviewRecords.updateInterview(id, {
         status: 'Completed',
         completion_percentage: Math.min(100, Math.max(0, completionPercentage)),
         updated_at: new Date().toISOString(),
       });
-      if (isSupabaseConfigured && isUuid(id)) {
-        await completeInterviewInSupabase(id, completionPercentage);
-      }
     },
-    [interviewRecords]
+    [answersState, notesState, interviewRecords]
   );
 
   return (
@@ -216,6 +201,8 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateInterview: interviewRecords.updateInterview,
         deleteInterview: handleDeleteInterview,
         completeInterview,
+        flushAnswersSave: answersState.flushAnswersSave,
+        flushNotesSave: notesState.flushNotesSave,
         getInterviewAnswers: answersState.getInterviewAnswers,
         saveAnswer: answersState.saveAnswer,
         getInterviewChecklist: checklistState.getInterviewChecklist,

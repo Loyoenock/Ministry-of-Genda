@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { DocumentItem, RecentActivityItem } from '../types';
-import { INITIAL_INTERVIEWS, createInitialChecklist } from '../lib/mockData';
+import { createInitialChecklist } from '../lib/mockData';
 import { isSupabaseConfigured } from '../lib/supabase';
 import {
   isUuid,
@@ -26,67 +26,8 @@ export function useChecklistState({
   setAutoSaveStatus,
   addRecentActivity,
 }: UseChecklistStateOptions) {
-  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
-
-  const [checklistsMap, setChecklistsMap] = useState<Record<string, DocumentItem[]>>(() => {
-    if (isTestEnv) {
-      const initial: Record<string, DocumentItem[]> = {};
-      INITIAL_INTERVIEWS.forEach((it) => {
-        initial[it.id] = createInitialChecklist(it.id);
-      });
-      return initial;
-    }
-    if (isSupabaseConfigured) {
-      const saved = localStorage.getItem('mglsd_checklists');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const realChecklists: Record<string, DocumentItem[]> = {};
-          Object.keys(parsed).forEach((k) => {
-            if (isUuid(k)) {
-              realChecklists[k] = parsed[k];
-            }
-          });
-          return realChecklists;
-        } catch {
-          // ignore
-        }
-      }
-      return {};
-    }
-    const saved = localStorage.getItem('mglsd_checklists');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    const initial: Record<string, DocumentItem[]> = {};
-    INITIAL_INTERVIEWS.forEach((it) => {
-      initial[it.id] = createInitialChecklist(it.id);
-    });
-    return initial;
-  });
-
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      if (isSupabaseConfigured) {
-        const realOnly: Record<string, DocumentItem[]> = {};
-        Object.keys(checklistsMap).forEach((k) => {
-          if (isUuid(k)) {
-            realOnly[k] = checklistsMap[k];
-          }
-        });
-        localStorage.setItem('mglsd_checklists', JSON.stringify(realOnly));
-      } else {
-        localStorage.setItem('mglsd_checklists', JSON.stringify(checklistsMap));
-      }
-    } catch {
-      // quota guard
-    }
-  }, [checklistsMap]);
+  // Pure Supabase-driven in-memory cache for active interview checklists
+  const [checklistsMap, setChecklistsMap] = useState<Record<string, DocumentItem[]>>({});
 
   const getInterviewChecklist = useCallback(
     (interviewId: string): DocumentItem[] => {

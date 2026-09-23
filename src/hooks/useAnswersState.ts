@@ -3,14 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Answer, Interview, InterviewStatus } from '../types';
-import { SAMPLE_ANSWERS_INT_001 } from '../lib/mockData';
 import { getQuestionsForTier } from '../lib/questionsService';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { isUuid, fetchAnswersFromSupabase, upsertAnswerInSupabase, updateInterviewInSupabase } from '../lib/interviewService';
+import {
+  isUuid,
+  fetchAnswersFromSupabase,
+  upsertAnswerInSupabase,
+  updateInterviewInSupabase,
+} from '../lib/interviewService';
 import { calculateInterviewProgress, calculateNextStatus } from '../lib/interviewCalculations';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
+
+interface PendingSaveItem {
+  interviewId: string;
+  questionId: string;
+  text: string;
+  structuredData?: Record<string, any>;
+  updatedPct: number;
+  nextStatus: InterviewStatus;
+}
 
 interface UseAnswersStateOptions {
   userId?: string | null;
@@ -25,66 +38,12 @@ export function useAnswersState({
   updateInterview,
   setAutoSaveStatus,
 }: UseAnswersStateOptions) {
-  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
-
-  const [answersMap, setAnswersMap] = useState<Record<string, Answer[]>>(() => {
-    if (isTestEnv) {
-      return {
-        'int-001': SAMPLE_ANSWERS_INT_001,
-      };
-    }
-    if (isSupabaseConfigured) {
-      const saved = localStorage.getItem('mglsd_answers');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const realAnswers: Record<string, Answer[]> = {};
-          Object.keys(parsed).forEach((k) => {
-            if (isUuid(k)) {
-              realAnswers[k] = parsed[k];
-            }
-          });
-          return realAnswers;
-        } catch {
-          // ignore
-        }
-      }
-      return {};
-    }
-    const saved = localStorage.getItem('mglsd_answers');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return {
-      'int-001': SAMPLE_ANSWERS_INT_001,
-    };
-  });
+  // Pure Supabase-driven in-memory cache for active interview sessions
+  const [answersMap, setAnswersMap] = useState<Record<string, Answer[]>>({});
 
   // Debounce timers map for saving answers
   const saveAnswerTimers = useRef<Record<string, NodeJS.Timeout>>({});
-
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      if (isSupabaseConfigured) {
-        const realOnly: Record<string, Answer[]> = {};
-        Object.keys(answersMap).forEach((k) => {
-          if (isUuid(k)) {
-            realOnly[k] = answersMap[k];
-          }
-        });
-        localStorage.setItem('mglsd_answers', JSON.stringify(realOnly));
-      } else {
-        localStorage.setItem('mglsd_answers', JSON.stringify(answersMap));
-      }
-    } catch {
-      // quota guard
-    }
-  }, [answersMap]);
+  const pendingSaves = useRef<Record<string, PendingSaveItem>>({});
 
   const getInterviewAnswers = useCallback(
     (interviewId: string): Answer[] => {
@@ -101,10 +60,15 @@ export function useAnswersState({
   }, []);
 
   const removeAnswersForInterview = useCallback((interviewId: string) => {
-    if (saveAnswerTimers.current[interviewId]) {
-      clearTimeout(saveAnswerTimers.current[interviewId]);
-      delete saveAnswerTimers.current[interviewId];
-    }
+    // Clear any timers for this interview
+    Object.keys(saveAnswerTimers.current).forEach((key) => {
+      if (key.startsWith(`${interviewId}-`)) {
+        clearTimeout(saveAnswerTimers.current[key]);
+        delete saveAnswerTimers.current[key];
+        delete pendingSaves.current[key];
+      }
+    });
+
     setAnswersMap((prev) => {
       const copy = { ...prev };
       delete copy[interviewId];
@@ -124,6 +88,57 @@ export function useAnswersState({
       console.warn('Notice: Error loading answers from Supabase:', err);
     }
   }, []);
+
+  /**
+   * Flushes all pending debounced answers for an interview to Supabase immediately.
+   */
+  const flushAnswersSave = useCallback(
+    async (interviewId: string): Promise<void> => {
+      const keysToFlush = Object.keys(pendingSaves.current).filter((k) =>
+        k.startsWith(`${interviewId}-`)
+      );
+
+      if (keysToFlush.length === 0) return;
+
+      const savesToExecute: PendingSaveItem[] = [];
+      keysToFlush.forEach((k) => {
+        if (saveAnswerTimers.current[k]) {
+          clearTimeout(saveAnswerTimers.current[k]);
+          delete saveAnswerTimers.current[k];
+        }
+        savesToExecute.push(pendingSaves.current[k]);
+        delete pendingSaves.current[k];
+      });
+
+      if (!isSupabaseConfigured || !isUuid(interviewId)) return;
+
+      try {
+        await Promise.all(
+          savesToExecute.map((item) =>
+            upsertAnswerInSupabase(
+              item.interviewId,
+              item.questionId,
+              item.text,
+              item.structuredData,
+              userId || undefined
+            )
+          )
+        );
+
+        if (savesToExecute.length > 0) {
+          const latest = savesToExecute[savesToExecute.length - 1];
+          await updateInterviewInSupabase(interviewId, {
+            completion_percentage: latest.updatedPct,
+            status: latest.nextStatus,
+          });
+        }
+      } catch (err) {
+        console.error('Error flushing pending answers:', err);
+        throw err;
+      }
+    },
+    [userId]
+  );
 
   const saveAnswer = useCallback(
     (
@@ -183,13 +198,24 @@ export function useAnswersState({
         };
       });
 
-      // Debounce Supabase persistence
       const key = `${interviewId}-${questionId}`;
+      pendingSaves.current[key] = {
+        interviewId,
+        questionId,
+        text,
+        structuredData,
+        updatedPct,
+        nextStatus,
+      };
+
       if (saveAnswerTimers.current[key]) {
         clearTimeout(saveAnswerTimers.current[key]);
       }
 
       saveAnswerTimers.current[key] = setTimeout(async () => {
+        delete saveAnswerTimers.current[key];
+        delete pendingSaves.current[key];
+
         if (isSupabaseConfigured && isUuid(interviewId)) {
           try {
             await upsertAnswerInSupabase(
@@ -219,6 +245,7 @@ export function useAnswersState({
     answersMap,
     getInterviewAnswers,
     saveAnswer,
+    flushAnswersSave,
     loadAnswersFromSupabase,
     initAnswersForInterview,
     removeAnswersForInterview,
