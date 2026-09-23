@@ -37,7 +37,7 @@ export interface AuthContextType {
   addNewUser: (newUser: Omit<UserProfile, 'id'>) => Promise<void> | void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const INITIAL_USERS: UserProfile[] = [
   INITIAL_CURRENT_USER,

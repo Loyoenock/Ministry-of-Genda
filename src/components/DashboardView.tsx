@@ -84,10 +84,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [interviews]);
 
   const tierChartData = [
-    { name: 'Leadership', value: tierCounts.Leadership || 3, color: '#8b5cf6' },
-    { name: 'Management', value: tierCounts.Management || 3, color: '#3b82f6' },
-    { name: 'Frontline', value: tierCounts.Frontline || 4, color: '#0d9488' },
-    { name: 'Support/IT', value: tierCounts['Support/IT'] || 2, color: '#06b6d4' },
+    { name: 'Leadership', value: tierCounts.Leadership || 0, color: '#8b5cf6' },
+    { name: 'Management', value: tierCounts.Management || 0, color: '#3b82f6' },
+    { name: 'Frontline', value: tierCounts.Frontline || 0, color: '#0d9488' },
+    { name: 'Support/IT', value: tierCounts['Support/IT'] || 0, color: '#06b6d4' },
   ];
 
   // Filtered interviews for the data table
