@@ -8,6 +8,7 @@ import { UserProfile, UserRole } from '../types';
 import { INITIAL_CURRENT_USER, ADMIN_USER } from '../lib/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
+import { mapSignInError, mapSignUpError, AuthErrorCode } from '../lib/authErrorMapper';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -20,8 +21,13 @@ export interface AuthContextType {
   isSupabaseConfigured: boolean;
   allUsers: UserProfile[];
   authError: string | null;
-  login: (email: string, password?: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string, department?: string) => Promise<{ error: any }>;
+  login: (email: string, password?: string) => Promise<{ error: any; code?: AuthErrorCode }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    department?: string
+  ) => Promise<{ error: any; needsConfirmation?: boolean; code?: AuthErrorCode }>;
   logout: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
   demoLogin: (role?: UserRole) => void;
@@ -358,22 +364,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Real Supabase Sign In (or local fallback in demo mode)
    */
-  const login = async (email: string, password?: string): Promise<{ error: any }> => {
+  const login = async (email: string, password?: string): Promise<{ error: any; code?: AuthErrorCode }> => {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password?.trim() || '';
+
+    if (!trimmedEmail) {
+      const err = new Error('Please enter your email address.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
+    if (!trimmedPassword) {
+      const err = new Error('Please enter your account password.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_CREDENTIALS' };
+    }
+
+    setAuthError(null);
+
     // If real Supabase is configured, require password and authenticate with Supabase Auth
     if (isSupabaseConfigured) {
-      if (!password) {
-        return { error: new Error('Password is required for Supabase authentication.') };
-      }
       setLoading(true);
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password.trim(),
+          email: trimmedEmail,
+          password: trimmedPassword,
         });
 
         if (error) {
           setLoading(false);
-          return { error };
+          const mapped = mapSignInError(error);
+          setAuthError(mapped.message);
+          return { error: new Error(mapped.message), code: mapped.code };
         }
 
         if (data.user) {
@@ -382,27 +403,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('mglsd_active_user_id');
           await fetchOrCreateProfile(data.user);
         }
+        setAuthError(null);
         return { error: null };
       } catch (err: any) {
         setLoading(false);
-        return { error: err };
+        const mapped = mapSignInError(err);
+        setAuthError(mapped.message);
+        return { error: new Error(mapped.message), code: mapped.code };
       }
     }
 
     // Demo Mode fallback: match mock user or create temporary user
-    const existing = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase());
     if (existing) {
       setCurrentUser(existing);
       setActualRole(existing.role);
       setActiveRole(existing.role);
       setIsDemoMode(true);
+      setAuthError(null);
       return { error: null };
     }
 
     const newUser: UserProfile = {
       id: `usr-${Date.now()}`,
-      email: email.trim(),
-      full_name: email.split('@')[0].replace(/[._]/g, ' '),
+      email: trimmedEmail,
+      full_name: trimmedEmail.split('@')[0].replace(/[._]/g, ' '),
       role: 'interviewer',
       department_unit: 'Labour Directorate',
       avatar_url: INITIAL_CURRENT_USER.avatar_url,
@@ -412,6 +437,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActualRole('interviewer');
     setActiveRole('interviewer');
     setIsDemoMode(true);
+    setAuthError(null);
     return { error: null };
   };
 
@@ -423,17 +449,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     department?: string
-  ): Promise<{ error: any }> => {
+  ): Promise<{ error: any; needsConfirmation?: boolean; code?: AuthErrorCode }> => {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    const trimmedFullName = fullName.trim();
+
+    if (!trimmedEmail) {
+      const err = new Error('Please enter your email address.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
+
+    if (!trimmedFullName) {
+      const err = new Error('Please enter your official full name.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_CREDENTIALS' };
+    }
+
+    if (trimmedPassword.length < 6) {
+      const err = new Error('Password must be at least 6 characters long.');
+      setAuthError(err.message);
+      return { error: err, code: 'WEAK_PASSWORD' };
+    }
+
+    setAuthError(null);
+
     if (isSupabaseConfigured) {
       setLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password.trim(),
+          email: trimmedEmail,
+          password: trimmedPassword,
           options: {
             data: {
-              full_name: fullName.trim(),
-              department_unit: department || 'Labour Directorate',
+              full_name: trimmedFullName,
+              department_unit: department?.trim() || 'Labour Directorate',
               role: 'interviewer',
             },
           },
@@ -441,28 +491,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           setLoading(false);
-          return { error };
+          const mapped = mapSignUpError(error);
+          setAuthError(mapped.message);
+          return { error: new Error(mapped.message), code: mapped.code };
         }
 
-        if (data.user) {
+        // Supabase duplicate email detection when email confirmation is enabled:
+        // Supabase returns an obfuscated user object with an empty identities array []
+        if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setLoading(false);
+          const msg = 'An account with this email already exists. Please sign in instead.';
+          setAuthError(msg);
+          return {
+            error: new Error(msg),
+            code: 'USER_ALREADY_EXISTS',
+          };
+        }
+
+        if (data?.user) {
           setIsDemoMode(false);
           localStorage.removeItem('mglsd_demo_user');
-          await fetchOrCreateProfile(data.user);
+
+          // If session exists (email confirmation disabled in Supabase project), user is logged in immediately
+          if (data.session) {
+            await fetchOrCreateProfile(data.user);
+            setAuthError(null);
+            return { error: null, needsConfirmation: false };
+          } else {
+            // Confirmation email was sent; user needs to confirm
+            setLoading(false);
+            setAuthError(null);
+            return { error: null, needsConfirmation: true };
+          }
         }
-        return { error: null };
+
+        setLoading(false);
+        return { error: null, needsConfirmation: true };
       } catch (err: any) {
         setLoading(false);
-        return { error: err };
+        const mapped = mapSignUpError(err);
+        setAuthError(mapped.message);
+        return { error: new Error(mapped.message), code: mapped.code };
       }
     }
 
-    // Demo Mode sign up
+    // Demo Mode sign up: check for duplicate email
+    const duplicate = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase());
+    if (duplicate) {
+      const msg = 'An account with this email already exists. Please sign in instead.';
+      setAuthError(msg);
+      return {
+        error: new Error(msg),
+        code: 'USER_ALREADY_EXISTS',
+      };
+    }
+
     const newUser: UserProfile = {
       id: `usr-${Date.now()}`,
-      email: email.trim(),
-      full_name: fullName.trim(),
+      email: trimmedEmail,
+      full_name: trimmedFullName,
       role: 'interviewer',
-      department_unit: department || 'Labour Directorate',
+      department_unit: department?.trim() || 'Labour Directorate',
       avatar_url: INITIAL_CURRENT_USER.avatar_url,
     };
     setUsers((prev) => [...prev, newUser]);
@@ -470,7 +559,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActualRole('interviewer');
     setActiveRole('interviewer');
     setIsDemoMode(true);
-    return { error: null };
+    setAuthError(null);
+    return { error: null, needsConfirmation: false };
   };
 
   /**
