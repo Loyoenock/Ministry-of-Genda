@@ -9,6 +9,7 @@ import { INITIAL_CURRENT_USER, ADMIN_USER } from '../lib/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { mapSignInError, mapSignUpError, AuthErrorCode } from '../lib/authErrorMapper';
+import { isAllowedEmail, UNAUTHORIZED_DOMAIN_MESSAGE } from '../lib/validation';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -373,6 +374,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthError(err.message);
       return { error: err, code: 'INVALID_EMAIL' };
     }
+    if (!isAllowedEmail(trimmedEmail)) {
+      const err = new Error(UNAUTHORIZED_DOMAIN_MESSAGE);
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
     if (!trimmedPassword) {
       const err = new Error('Please enter your account password.');
       setAuthError(err.message);
@@ -456,6 +462,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!trimmedEmail) {
       const err = new Error('Please enter your email address.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
+
+    if (!isAllowedEmail(trimmedEmail)) {
+      const err = new Error(UNAUTHORIZED_DOMAIN_MESSAGE);
       setAuthError(err.message);
       return { error: err, code: 'INVALID_EMAIL' };
     }
