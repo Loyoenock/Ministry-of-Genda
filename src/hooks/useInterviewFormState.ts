@@ -14,10 +14,12 @@ export function useInterviewFormState(interviewId: string) {
     interviews,
     getInterviewAnswers,
     saveAnswer,
+    flushAnswersSave: contextFlushAnswersSave,
     getInterviewChecklist,
     updateChecklistItem,
     getInterviewNotes,
     saveNotes,
+    flushNotesSave: contextFlushNotesSave,
     uploadDocumentFile,
     updateInterview,
     deleteInterview,
@@ -111,6 +113,17 @@ export function useInterviewFormState(interviewId: string) {
     lastSavedNotesRef.current = notes;
   }, [interviewId]);
 
+  // Flushes pending questionnaire answers immediately
+  const flushAnswersSave = useCallback(
+    async (targetInterviewId?: string) => {
+      const idToFlush = targetInterviewId || interviewId;
+      if (idToFlush && contextFlushAnswersSave) {
+        await contextFlushAnswersSave(idToFlush);
+      }
+    },
+    [interviewId, contextFlushAnswersSave]
+  );
+
   // Flushes pending notes updates immediately with error rollback
   const flushNotesSave = useCallback(async () => {
     if (saveDebounceTimerRef.current) {
@@ -120,6 +133,9 @@ export function useInterviewFormState(interviewId: string) {
 
     const updatesToSave = { ...pendingUpdatesRef.current };
     if (Object.keys(updatesToSave).length === 0) {
+      if (contextFlushNotesSave) {
+        await contextFlushNotesSave(interviewId);
+      }
       return;
     }
 
@@ -130,6 +146,10 @@ export function useInterviewFormState(interviewId: string) {
       setLocalAutoSaveStatus('saving');
 
       await saveNotes(interviewId, updatesToSave);
+
+      if (contextFlushNotesSave) {
+        await contextFlushNotesSave(interviewId);
+      }
 
       // On successful save: update last saved baseline
       lastSavedNotesRef.current = {
@@ -145,8 +165,21 @@ export function useInterviewFormState(interviewId: string) {
       pendingUpdatesRef.current = {};
       setAutoSaveStatus?.('error');
       setLocalAutoSaveStatus('error');
+      throw err;
     }
-  }, [interviewId, saveNotes, setAutoSaveStatus]);
+  }, [interviewId, saveNotes, contextFlushNotesSave, setAutoSaveStatus]);
+
+  // Combined helper flushing both answers and notes before interview completion
+  const flushAllPendingSaves = useCallback(
+    async (targetInterviewId?: string) => {
+      const idToFlush = targetInterviewId || interviewId;
+      await Promise.all([
+        flushAnswersSave(idToFlush),
+        flushNotesSave(),
+      ]);
+    },
+    [interviewId, flushAnswersSave, flushNotesSave]
+  );
 
   // Debounces note updates by 700ms (within 600–800ms)
   const scheduleNotesSave = useCallback(
@@ -164,7 +197,7 @@ export function useInterviewFormState(interviewId: string) {
       setLocalAutoSaveStatus('saving');
 
       saveDebounceTimerRef.current = setTimeout(() => {
-        flushNotesSave();
+        flushNotesSave().catch(() => {});
       }, 700);
     },
     [flushNotesSave, setAutoSaveStatus]
@@ -255,7 +288,9 @@ export function useInterviewFormState(interviewId: string) {
     handleNoteFieldChange,
     handleNumbersCapturedChange,
     handleMaturityScoreChange,
+    flushAnswersSave,
     flushNotesSave,
+    flushAllPendingSaves,
     answeredCount,
     overallPercentage,
     collectedDocsCount,

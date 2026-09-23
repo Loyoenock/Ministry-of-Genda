@@ -74,6 +74,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     updateInterview,
     deleteInterview,
     completeInterview,
+    flushAnswersSave,
     flushNotesSave,
     autoSaveStatus,
     questionsLoading,
@@ -95,8 +96,11 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
 
     setIsCompleting(true);
     try {
-      // Flush any pending auto-saves
-      await flushNotesSave();
+      // Flush every pending debounced write BEFORE marking complete
+      await Promise.all([
+        flushAnswersSave(interview.id),
+        flushNotesSave(),
+      ]);
 
       // Complete interview in Supabase and context
       await completeInterview(interview.id, overallPercentage);

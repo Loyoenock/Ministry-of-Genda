@@ -3,11 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import React, { useEffect } from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { InterviewProvider, useInterviews } from '../context/InterviewContext';
+import { useInterviewFormState } from '../hooks/useInterviewFormState';
+import { DynamicInterviewForm } from '../components/DynamicInterviewForm';
+import { supabase } from '../lib/supabase';
+import { MASTER_QUESTIONS } from '../lib/questionsData';
+import { updateQuestionsCache } from '../lib/questionsService';
 
 function TestInterviewConsumer() {
   const { user } = useAuth();
@@ -237,5 +242,128 @@ describe('InterviewContext Supabase Persistence & State Operations', () => {
 
     const countAfterDelete = parseInt(screen.getByTestId('interview-count').textContent || '0');
     expect(countAfterDelete).toBe(countBeforeDelete - 1);
+  });
+
+  it('flushes pending questionnaire answers entered in DynamicInterviewForm when clicking Finish Interview & Complete', async () => {
+    vi.useFakeTimers();
+
+    const upsertedAnswers: any[] = [];
+    const updatedInterviews: any[] = [];
+
+    const originalFrom = supabase.from.bind(supabase);
+    const fromSpy = vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'answers') {
+        return {
+          upsert: (payload: any) => {
+            upsertedAnswers.push(payload);
+            return {
+              select: () => ({
+                single: async () => ({
+                  data: { id: 'ans-test-2', ...payload, created_at: new Date().toISOString() },
+                  error: null,
+                }),
+              }),
+            };
+          },
+          select: () => ({
+            eq: () => Promise.resolve({ data: upsertedAnswers, error: null }),
+          }),
+        } as any;
+      }
+      if (table === 'interviews') {
+        return {
+          update: (updates: any) => {
+            return {
+              eq: async (field: string, val: string) => {
+                updatedInterviews.push({ [field]: val, ...updates });
+                return { data: null, error: null };
+              },
+            };
+          },
+          select: () => ({
+            order: () => Promise.resolve({ data: [], error: null }),
+          }),
+        } as any;
+      }
+      if (table === 'questions') {
+        return {
+          select: () => ({
+            order: () => Promise.resolve({ data: MASTER_QUESTIONS, error: null }),
+          }),
+        } as any;
+      }
+      return originalFrom(table);
+    });
+
+    try {
+      let createdInterviewId = '';
+      function DynamicHarness() {
+        const { createInterview, selectInterview } = useInterviews();
+
+        useEffect(() => {
+          const created = createInterview({
+            interviewee_name: 'Dr. Jane Akello',
+            role_title: 'Commissioner OSH',
+            department_unit: 'OSH Department',
+            years_in_role: 4,
+            interview_date: '2025-09-20',
+            interview_time: '11:00 AM',
+            location: 'Ministry HQ',
+            interviewer_id: 'usr-john-okello-001',
+            interviewer_name: 'John Okello',
+            tier: 'Leadership',
+            status: 'Draft',
+            duration_min: 60,
+          });
+          createdInterviewId = created.id;
+          selectInterview(created.id);
+        }, [createInterview, selectInterview]);
+
+        if (!createdInterviewId) return null;
+        return <DynamicInterviewForm interviewId={createdInterviewId} onBack={() => {}} />;
+      }
+
+      updateQuestionsCache(MASTER_QUESTIONS, 'supabase');
+
+      render(
+        <AuthProvider>
+          <InterviewProvider>
+            <DynamicHarness />
+          </InterviewProvider>
+        </AuthProvider>
+      );
+
+      // Verify form rendered
+      expect(screen.getByText('Dr. Jane Akello')).toBeInTheDocument();
+
+      // Find questionnaire textarea for question A1
+      const answerInput = screen.getByTestId('question-input-A1');
+
+      // Type an answer
+      act(() => {
+        fireEvent.change(answerInput, {
+          target: { value: 'Direct form test answer entered before debounce' },
+        });
+      });
+
+      // Zero time elapsed, click finish
+      const finishBtn = screen.getByRole('button', { name: /Finish Interview & Complete/i });
+      await act(async () => {
+        fireEvent.click(finishBtn);
+      });
+
+      // Assert persisted
+      expect(upsertedAnswers.length).toBeGreaterThan(0);
+      expect(
+        upsertedAnswers.some((a) => a.answer_text === 'Direct form test answer entered before debounce')
+      ).toBe(true);
+
+      expect(
+        updatedInterviews.some((i) => i.status === 'Completed')
+      ).toBe(true);
+    } finally {
+      fromSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

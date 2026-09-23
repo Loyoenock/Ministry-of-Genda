@@ -110,10 +110,13 @@ export function useAnswersState({
         delete pendingSaves.current[k];
       });
 
-      if (!isSupabaseConfigured || !isUuid(interviewId)) return;
+      if (!isSupabaseConfigured || !isUuid(interviewId)) {
+        setAutoSaveStatus('saved');
+        return;
+      }
 
       try {
-        await Promise.all(
+        const results = await Promise.all(
           savesToExecute.map((item) =>
             upsertAnswerInSupabase(
               item.interviewId,
@@ -125,6 +128,10 @@ export function useAnswersState({
           )
         );
 
+        if (results.some((res) => res === null)) {
+          throw new Error('Failed to persist one or more questionnaire answers to database.');
+        }
+
         if (savesToExecute.length > 0) {
           const latest = savesToExecute[savesToExecute.length - 1];
           await updateInterviewInSupabase(interviewId, {
@@ -132,12 +139,14 @@ export function useAnswersState({
             status: latest.nextStatus,
           });
         }
+        setAutoSaveStatus('saved');
       } catch (err) {
+        setAutoSaveStatus('error');
         console.error('Error flushing pending answers:', err);
         throw err;
       }
     },
-    [userId]
+    [userId, setAutoSaveStatus]
   );
 
   const saveAnswer = useCallback(
