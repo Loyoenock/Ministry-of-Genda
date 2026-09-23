@@ -12,7 +12,7 @@ export const SupabaseConfigErrorView: React.FC = () => {
   const details = supabaseConfig.details;
 
   const handleCopy = () => {
-    const snippet = `SUPABASE_URL=https://your-project.supabase.co\nSUPABASE_ANON_KEY=your-anon-key`;
+    const snippet = `VITE_SUPABASE_URL=https://your-project.supabase.co\nVITE_SUPABASE_ANON_KEY=your-anon-key`;
     navigator.clipboard.writeText(snippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -52,7 +52,7 @@ export const SupabaseConfigErrorView: React.FC = () => {
             <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
               <span className="flex items-center space-x-2 text-slate-300">
                 {details?.hasUrl ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <XCircle className="w-3.5 h-3.5 text-rose-400" />}
-                <span>SUPABASE_URL provided</span>
+                <span>VITE_SUPABASE_URL provided</span>
               </span>
               <span className={details?.hasUrl ? 'text-emerald-400' : 'text-rose-400'}>
                 {details?.hasUrl ? (supabaseConfig.maskedUrl || 'Present') : 'Missing'}
@@ -62,7 +62,7 @@ export const SupabaseConfigErrorView: React.FC = () => {
             <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
               <span className="flex items-center space-x-2 text-slate-300">
                 {details?.hasKey ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <XCircle className="w-3.5 h-3.5 text-rose-400" />}
-                <span>SUPABASE_ANON_KEY provided</span>
+                <span>VITE_SUPABASE_ANON_KEY provided</span>
               </span>
               <span className={details?.hasKey ? 'text-emerald-400' : 'text-rose-400'}>
                 {details?.hasKey ? (supabaseConfig.maskedKey || 'Present') : 'Missing'}
@@ -94,10 +94,10 @@ export const SupabaseConfigErrorView: React.FC = () => {
           <div className="p-4 bg-amber-500/5 rounded-2xl border border-amber-500/20 text-slate-300 space-y-1.5 text-[11px]">
             <p className="font-bold text-amber-400">Troubleshooting Checklist:</p>
             <ul className="list-disc list-inside space-y-1 text-slate-300">
-              <li>Confirm <code className="text-teal-300">.env</code> is located in the project root (same directory as <code className="text-teal-300">package.json</code>).</li>
-              <li>Restart your dev server completely (<code className="text-teal-300">npm run dev</code>) after changing <code className="text-teal-300">.env</code>.</li>
-              <li>Ensure variable names are set to <code className="text-teal-300">SUPABASE_URL</code> and <code className="text-teal-300">SUPABASE_ANON_KEY</code>.</li>
-              <li>Remove any accidental wrapping quotes around the URL or key values in <code className="text-teal-300">.env</code>.</li>
+              <li>Ensure variable names start with the mandatory <code className="text-teal-300">VITE_</code> prefix (<code className="text-teal-300">VITE_SUPABASE_URL</code> &amp; <code className="text-teal-300">VITE_SUPABASE_ANON_KEY</code>).</li>
+              <li>On Vercel, you must <strong>redeploy</strong> your project after adding or changing environment variables so they are embedded in the build.</li>
+              <li>Confirm <code className="text-teal-300">.env</code> is located in the project root (same directory as <code className="text-teal-300">package.json</code>) for local development.</li>
+              <li>Remove any accidental wrapping quotes around the URL or key values.</li>
             </ul>
           </div>
         </div>
@@ -118,9 +118,9 @@ export const SupabaseConfigErrorView: React.FC = () => {
           </div>
 
           <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1.5 shadow-inner">
-            <p className="text-amber-400 font-bold"># Create or update your .env file at the project root:</p>
-            <p className="text-teal-300">SUPABASE_URL=https://your-project-id.supabase.co</p>
-            <p className="text-teal-300">SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</p>
+            <p className="text-amber-400 font-bold"># Create or update your .env file at the project root / Vercel:</p>
+            <p className="text-teal-300">VITE_SUPABASE_URL=https://your-project-id.supabase.co</p>
+            <p className="text-teal-300">VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</p>
           </div>
         </div>
 

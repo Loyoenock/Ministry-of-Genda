@@ -48,15 +48,15 @@ const hasValidProtocol = rawUrl.startsWith('https://') || rawUrl.startsWith('htt
 
 let errorMessage: string | null = null;
 if (!hasUrl && !hasKey) {
-  errorMessage = 'Both SUPABASE_URL and SUPABASE_ANON_KEY are missing from your environment variables.';
+  errorMessage = 'Both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are missing from your environment variables.';
 } else if (!hasUrl) {
-  errorMessage = 'SUPABASE_URL is missing from your environment variables.';
+  errorMessage = 'VITE_SUPABASE_URL is missing from your environment variables.';
 } else if (!hasKey) {
-  errorMessage = 'SUPABASE_ANON_KEY is missing from your environment variables.';
+  errorMessage = 'VITE_SUPABASE_ANON_KEY is missing from your environment variables.';
 } else if (isUrlPlaceholder || isKeyPlaceholder) {
   errorMessage = 'Detected placeholder values in Supabase environment variables. Please replace them with your actual Supabase project URL and anon API key.';
 } else if (!hasValidProtocol) {
-  errorMessage = 'SUPABASE_URL must start with https:// or http://.';
+  errorMessage = 'VITE_SUPABASE_URL must start with https:// or http://.';
 }
 
 export const isConfigured = Boolean(
