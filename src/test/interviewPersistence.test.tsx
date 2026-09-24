@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { InterviewProvider, useInterviews } from '../context/InterviewContext';
@@ -143,6 +143,10 @@ function TestInterviewConsumer() {
 }
 
 describe('InterviewContext Supabase Persistence & State Operations', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
   it('creates an interview with optimistic update and initial checklists/notes', async () => {
     render(
       <AuthProvider>

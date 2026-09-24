@@ -572,6 +572,38 @@ To guarantee that email domain restrictions cannot be bypassed by clients callin
 
 ---
 
+## 9.5 Operator Guide: Signup Succeeds But Login Fails (Email Confirmation)
+
+### Root Cause
+Users can successfully create accounts (`supabase.auth.signUp`), but subsequent sign-in attempts fail with `EMAIL_NOT_CONFIRMED` (HTTP 400). This occurs because Supabase Auth has **Email Confirmation** enabled by default, creating user rows where `email_confirmed_at IS NULL` and returning no session upon sign-up.
+
+### Diagnostic SQL
+Operators can check user confirmation status directly in the Supabase SQL Editor:
+```sql
+select id, email, email_confirmed_at, created_at
+from auth.users
+order by created_at desc
+limit 20;
+```
+
+### Resolution Options
+1. **Manual Confirmation via Supabase Dashboard**:
+   - Navigate to **Authentication** → **Users**.
+   - Locate the target user, click the **...** (ellipsis) menu next to their record, and select **Confirm email**.
+2. **Manual Confirmation via SQL**:
+   ```sql
+   update auth.users
+   set email_confirmed_at = now()
+   where email = 'officer@mglsd.go.ug';
+   ```
+3. **Disabling Email Confirmation (Closed Ministry Deployment Trade-Off)**:
+   - To bypass email confirmation so sign-up returns an active session immediately:
+     - Navigate to **Authentication** → **Providers** → **Email** in the Supabase Dashboard.
+     - Uncheck **Confirm email**.
+   - *Trade-off*: While convenient for closed internal ministry deployments where SMTP servers may not be configured, keeping email confirmation enabled is strongly recommended for any publicly reachable deployment to prevent unauthorized sign-ups with unverified addresses.
+
+---
+
 ## 10. Known Limitations & Technical Debt
 
 During recent architectural audits, the following areas were identified for future refactoring:
