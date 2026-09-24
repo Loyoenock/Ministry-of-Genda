@@ -16,7 +16,7 @@ import {
   isAllowedEmail,
   UNAUTHORIZED_DOMAIN_MESSAGE,
 } from '../lib/validation';
-import { mapSignInError, mapSignUpError } from '../lib/authErrorMapper';
+import { mapSignInError, mapSignUpError, getAuthFeedback } from '../lib/authErrorMapper';
 
 describe('Validation Utilities & Domain Restrictions', () => {
   it('correctly validates allowed email domains', () => {
@@ -536,5 +536,41 @@ describe('LoginView - Supabase Auth Error Feedback & Duplicate Handling', () => 
     expect(successAlert.textContent).toContain(
       'Account created successfully. Please check your inbox to confirm your email before signing in.'
     );
+  });
+});
+
+describe('Centralised Auth Feedback Helper (getAuthFeedback)', () => {
+  it('returns correct feedback for INVALID_CREDENTIALS', () => {
+    const fb = getAuthFeedback('INVALID_CREDENTIALS');
+    expect(fb.message).toBe('Incorrect email or password.');
+    expect(fb.severity).toBe('error');
+  });
+
+  it('returns correct feedback for EMAIL_NOT_CONFIRMED', () => {
+    const fb = getAuthFeedback('EMAIL_NOT_CONFIRMED');
+    expect(fb.message).toContain('Please confirm your email before signing in');
+    expect(fb.severity).toBe('error');
+  });
+
+  it('returns correct feedback for RATE_LIMITED', () => {
+    const fb = getAuthFeedback('RATE_LIMITED');
+    expect(fb.message).toContain('Too many attempts');
+  });
+
+  it('returns correct feedback for NETWORK_ERROR', () => {
+    const fb = getAuthFeedback('NETWORK_ERROR');
+    expect(fb.message).toContain('Unable to reach the authentication server');
+  });
+
+  it('returns correct feedback for USER_ALREADY_EXISTS', () => {
+    const fb = getAuthFeedback('USER_ALREADY_EXISTS');
+    expect(fb.message).toContain('An account with this email already exists');
+  });
+
+  it('returns correct feedback for CHECK_EMAIL / needsConfirmation', () => {
+    const fb = getAuthFeedback('CHECK_EMAIL', { email: 'test@mglsd.go.ug' });
+    expect(fb.title).toBe('Confirm your email');
+    expect(fb.message).toContain('test@mglsd.go.ug');
+    expect(fb.severity).toBe('info');
   });
 });

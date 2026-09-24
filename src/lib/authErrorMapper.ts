@@ -13,9 +13,94 @@ export type AuthErrorCode =
   | 'NETWORK_ERROR'
   | 'UNKNOWN';
 
+export type AuthSeverity = 'error' | 'success' | 'info';
+
+export interface AuthFeedback {
+  title?: string;
+  message: string;
+  code: AuthErrorCode | string;
+  severity: AuthSeverity;
+}
+
 export interface MappedAuthError {
   message: string;
   code: AuthErrorCode;
+}
+
+/**
+ * Centralised user-facing copy helper for all authentication scenarios.
+ */
+export function getAuthFeedback(
+  codeOrScenario: AuthErrorCode | string,
+  context?: { email?: string; mode?: 'signin' | 'signup' }
+): AuthFeedback {
+  const code = (codeOrScenario || 'UNKNOWN').toUpperCase();
+
+  switch (code) {
+    case 'INVALID_CREDENTIALS':
+      return {
+        message: 'Incorrect email or password.',
+        code: 'INVALID_CREDENTIALS',
+        severity: 'error',
+      };
+    case 'EMAIL_NOT_CONFIRMED':
+      return {
+        message: 'Please confirm your email before signing in. Check your inbox for the confirmation link from MGLSD Diagnostic.',
+        code: 'EMAIL_NOT_CONFIRMED',
+        severity: 'error',
+      };
+    case 'RATE_LIMITED':
+      return {
+        message: 'Too many attempts. Please wait a few minutes and try again.',
+        code: 'RATE_LIMITED',
+        severity: 'error',
+      };
+    case 'NETWORK_ERROR':
+      return {
+        message: 'Unable to reach the authentication server. Check your network connection and try again.',
+        code: 'NETWORK_ERROR',
+        severity: 'error',
+      };
+    case 'USER_ALREADY_EXISTS':
+      return {
+        message: 'An account with this email already exists. Please sign in instead.',
+        code: 'USER_ALREADY_EXISTS',
+        severity: 'error',
+      };
+    case 'WEAK_PASSWORD':
+      return {
+        message: 'Password must be at least 6 characters. Use a stronger password for your ministry account.',
+        code: 'WEAK_PASSWORD',
+        severity: 'error',
+      };
+    case 'CHECK_EMAIL':
+    case 'NEEDS_CONFIRMATION':
+      return {
+        title: 'Confirm your email',
+        message: `We created your account for ${context?.email || 'your email'}. Open the confirmation link sent by MGLSD Diagnostic, then sign in.`,
+        code: 'EMAIL_NOT_CONFIRMED',
+        severity: 'info',
+      };
+    case 'SIGNUP_SUCCESS':
+      return {
+        message: 'Account created successfully. Welcome to the MGLSD Labour Directorate diagnostic workspace.',
+        code: 'UNKNOWN',
+        severity: 'success',
+      };
+    case 'RESEND_SUCCESS':
+      return {
+        message: 'Confirmation email sent again. Check your inbox and spam folder.',
+        code: 'UNKNOWN',
+        severity: 'success',
+      };
+    case 'UNKNOWN':
+    default:
+      return {
+        message: 'Please try again. If the problem continues, contact the system administrator.',
+        code: 'UNKNOWN',
+        severity: 'error',
+      };
+  }
 }
 
 /**
