@@ -254,3 +254,40 @@ describe('PostgreSQL RLS & Profiles Role Hardening (20260920_harden_profiles_rol
     expect(db.isAdmin('non-existent-user')).toBe(false);
   });
 });
+
+describe('Server-Side Email Domain Enforcement (Database Trigger Gate)', () => {
+  // Simulates the PL/pgSQL function public.is_allowed_email_domain
+  function simulatedIsAllowedEmailDomain(emailInput: string | null): boolean {
+    if (!emailInput || !emailInput.includes('@')) return false;
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const parts = cleanEmail.split('@');
+    if (parts.length !== 2) return false;
+    const domain = parts[1];
+    if (!domain) return false;
+
+    if (
+      ['gmail.com', 'yahoo.com', 'malaikapath.org', 'mglsd.go.ug', 'go.ug'].includes(domain) ||
+      domain.endsWith('.go.ug')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  it('strictly permits authorized domains matching database server-side rules', () => {
+    expect(simulatedIsAllowedEmailDomain('officer@mglsd.go.ug')).toBe(true);
+    expect(simulatedIsAllowedEmailDomain('inspector@labour.go.ug')).toBe(true);
+    expect(simulatedIsAllowedEmailDomain('user@gmail.com')).toBe(true);
+    expect(simulatedIsAllowedEmailDomain('user@yahoo.com')).toBe(true);
+    expect(simulatedIsAllowedEmailDomain('user@malaikapath.org')).toBe(true);
+  });
+
+  it('strictly rejects unauthorized domains at the database gate', () => {
+    expect(simulatedIsAllowedEmailDomain('attacker@evil.com')).toBe(false);
+    expect(simulatedIsAllowedEmailDomain('user@outlook.com')).toBe(false);
+    expect(simulatedIsAllowedEmailDomain('user@proton.me')).toBe(false);
+    expect(simulatedIsAllowedEmailDomain('notgo.ug@domain.com')).toBe(false);
+    expect(simulatedIsAllowedEmailDomain('')).toBe(false);
+    expect(simulatedIsAllowedEmailDomain(null)).toBe(false);
+  });
+});

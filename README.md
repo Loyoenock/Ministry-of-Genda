@@ -552,6 +552,17 @@ To prevent unauthorized privilege escalation (`await supabase.from('profiles').u
    - `AuthContext.updateProfile` strips the `role` attribute before updating client state or emitting REST queries.
    - `AuthContext.updateUserRole` requires `actualRole === 'admin'`.
 
+### Server-Side Email Domain Enforcement Gate
+To guarantee that email domain restrictions cannot be bypassed by clients calling `supabase.auth.signUp` directly:
+1. **Database-Level Allow-List Enforcement (`trg_enforce_profile_email_domain`)**:
+   - Executes `BEFORE INSERT OR UPDATE OF email ON public.profiles`.
+   - Invokes `public.is_allowed_email_domain(NEW.email)`, validating against the canonical allow-list:
+     - Exact matches: `gmail.com`, `yahoo.com`, `malaikapath.org`, `mglsd.go.ug`.
+     - Subdomain wildcard: Any domain ending in `.go.ug` (e.g. `*.go.ug`).
+   - If an unauthorized domain attempts registration, the database raises an exception (`RAISE EXCEPTION 'This email domain is not authorised...'`), instantly blocking profile creation and aborting unauthorized sign-ups at the PostgreSQL level.
+2. **Client-Side UX Validation**:
+   - `src/lib/validation.ts` mirrors the exact same domain allow-list logic to provide immediate feedback to users during typing and form submission.
+
 ### Role Switching Mechanics
 - **Demo Mode**: The user profile dropdown in the top header features a quick-switch control allowing instant testing between interviewer and admin personas without re-authenticating.
 - **Real Supabase Mode**: Roles are strictly verified against the `role` column in `public.profiles` corresponding to the user's verified Supabase JWT (`auth.uid()`). Switching roles requires an administrator update in the database or `UserManagementView`.

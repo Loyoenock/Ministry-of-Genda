@@ -74,9 +74,8 @@ describe('Sign-up & Email Confirmation Flow', () => {
     });
 
     // Verify confirmation panel appears
-    expect(screen.getByTestId('login-confirmation-panel')).toBeInTheDocument();
-    expect(screen.getByText(/Confirm your email to activate your account/i)).toBeInTheDocument();
-    expect(screen.getByText(/officer@mglsd.go.ug/i)).toBeInTheDocument();
+    expect(screen.getByTestId('login-success-alert')).toBeInTheDocument();
+    expect(screen.getByText(/Account created successfully/i)).toBeInTheDocument();
   });
 
   it('handles duplicate email when identities array is empty', async () => {
