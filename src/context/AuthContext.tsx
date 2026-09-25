@@ -134,14 +134,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           authUser.email?.split('@')[0]?.replace(/[._]/g, ' ') ||
           'Labour Officer';
 
-        const rawRole = authUser.user_metadata?.role;
-        const defaultRole: UserRole = rawRole === 'admin' ? 'admin' : 'interviewer';
-
+        // Role is strictly 'interviewer' for newly created profiles / fallbacks (never derived from user_metadata)
         const newProfile: UserProfile = {
           id: authUser.id,
           email: authUser.email || '',
           full_name: fallbackName,
-          role: defaultRole,
+          role: 'interviewer',
           department_unit: authUser.user_metadata?.department_unit || 'Labour Directorate',
           phone_number: authUser.user_metadata?.phone_number || undefined,
           avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -184,13 +182,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActiveRole(mappedRole);
           } else {
             setCurrentUser(newProfile);
-            setActualRole(newProfile.role);
-            setActiveRole(newProfile.role);
+            setActualRole('interviewer');
+            setActiveRole('interviewer');
           }
         } else {
           setCurrentUser(newProfile);
-          setActualRole(newProfile.role);
-          setActiveRole(newProfile.role);
+          setActualRole('interviewer');
+          setActiveRole('interviewer');
         }
       }
 
@@ -223,6 +221,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           department_unit: authUser.user_metadata?.department_unit || 'Labour Directorate',
         };
         setCurrentUser(fallbackProfile);
+        setActualRole('interviewer');
+        setActiveRole('interviewer');
       }
     } finally {
       setLoading(false);
@@ -394,7 +394,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: 'interviewer',
           department_unit: data.user.user_metadata?.department_unit || 'Labour Directorate',
         };
-        setCurrentUser((prev) => prev || minimalProfile);
+        setCurrentUser((prev) => {
+          if (!prev) {
+            setActualRole('interviewer');
+            setActiveRole('interviewer');
+            return minimalProfile;
+          }
+          return prev;
+        });
       }
 
       setLoading(false);
