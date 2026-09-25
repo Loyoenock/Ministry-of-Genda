@@ -19,7 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { validateEmail, validatePassword, validateFullName } from '../lib/validation';
-import { AuthErrorCode } from '../lib/authErrorMapper';
+import { AuthErrorCode, mapResendError, mapSignInError, mapSignUpError } from '../lib/authErrorMapper';
 import { supabase } from '../lib/supabase';
 
 export const LoginView: React.FC = () => {
@@ -45,10 +45,12 @@ export const LoginView: React.FC = () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
       setErrorMessage('Please enter your email address above to resend confirmation.');
+      setErrorCode('INVALID_EMAIL');
       return;
     }
     setIsSubmitting(true);
     setErrorMessage(null);
+    setErrorCode(null);
     setSuccessMessage(null);
     try {
       const { error } = await supabase.auth.resend({
@@ -56,12 +58,18 @@ export const LoginView: React.FC = () => {
         email: trimmedEmail,
       });
       if (error) {
-        setErrorMessage(error.message || 'Failed to resend confirmation email.');
+        const mapped = mapResendError(error);
+        setErrorMessage(mapped.message);
+        setErrorCode(mapped.code);
       } else {
-        setSuccessMessage('Confirmation email re-sent successfully. Please check your inbox.');
+        setSuccessMessage('Confirmation email sent again. Check your inbox and spam folder.');
+        setErrorMessage(null);
+        setErrorCode(null);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to resend confirmation email.');
+      const mapped = mapResendError(err);
+      setErrorMessage(mapped.message);
+      setErrorCode(mapped.code);
     } finally {
       setIsSubmitting(false);
     }
@@ -240,9 +248,11 @@ export const LoginView: React.FC = () => {
         if (error) {
           setErrorMessage(error.message || 'Incorrect email or password.');
           setErrorCode(code || null);
-          if (code === 'EMAIL_NOT_CONFIRMED') {
-            setIsConfirmationRequired(true);
-          }
+          setIsConfirmationRequired(false);
+        } else {
+          setErrorMessage(null);
+          setErrorCode(null);
+          setIsConfirmationRequired(false);
         }
       } else {
         const { error, needsConfirmation, code } = await signUp(
@@ -256,22 +266,24 @@ export const LoginView: React.FC = () => {
             error.message || 'Registration could not be completed. Please try again.'
           );
           setErrorCode(code || null);
+          setIsConfirmationRequired(false);
         } else if (needsConfirmation) {
           setIsConfirmationRequired(true);
           setSuccessMessage(
             'Account created successfully. Please check your inbox to confirm your email before signing in.'
           );
         } else {
+          setIsConfirmationRequired(false);
           setSuccessMessage(
             'Account registered successfully! Welcome to the MGLSD Diagnostic workspace.'
           );
         }
       }
     } catch (err: any) {
-      setErrorMessage(
-        err.message || 'Unable to connect to the authentication server. Please check your network connection and try again.'
-      );
-      setErrorCode('NETWORK_ERROR');
+      const mapped = mode === 'signin' ? mapSignInError(err) : mapSignUpError(err);
+      setErrorMessage(mapped.message);
+      setErrorCode(mapped.code);
+      setIsConfirmationRequired(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -441,7 +453,7 @@ export const LoginView: React.FC = () => {
                         </button>
                       </div>
                     )}
-                    {errorCode === 'EMAIL_NOT_CONFIRMED' && (
+                    {errorCode === 'EMAIL_NOT_CONFIRMED' && !isConfirmationRequired && (
                       <div className="pt-2">
                         <button
                           type="button"

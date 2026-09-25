@@ -138,7 +138,11 @@ export function mapSignInError(error: any): MappedAuthError {
     rawMessage.includes('network') ||
     rawMessage.includes('connection') ||
     rawMessage.includes('failed to fetch') ||
-    rawMessage.includes('timeout')
+    rawMessage.includes('timeout') ||
+    rawMessage.includes('offline') ||
+    status === 0 ||
+    status === 503 ||
+    status === 504
   ) {
     return {
       message: 'Unable to connect to the authentication server. Please check your network connection and try again.',
@@ -148,11 +152,11 @@ export function mapSignInError(error: any): MappedAuthError {
 
   // Email not confirmed
   if (
+    error?.code === 'email_not_confirmed' ||
     rawMessage.includes('email not confirmed') ||
-    rawMessage.includes('not verified') ||
     rawMessage.includes('email_not_confirmed') ||
-    rawMessage.includes('confirm') ||
-    rawMessage.includes('verify')
+    rawMessage.includes('not verified') ||
+    rawMessage.includes('unconfirmed')
   ) {
     return {
       message: 'Please confirm your email before signing in. Check your inbox for the confirmation link.',
@@ -160,13 +164,15 @@ export function mapSignInError(error: any): MappedAuthError {
     };
   }
 
-  // Invalid credentials (generic to protect account privacy)
+  // Invalid credentials (generic to protect account privacy against email enumeration)
   if (
     rawMessage.includes('invalid login credentials') ||
     rawMessage.includes('invalid credentials') ||
     rawMessage.includes('invalid grant') ||
     rawMessage.includes('wrong password') ||
-    rawMessage.includes('user not found')
+    rawMessage.includes('user not found') ||
+    rawMessage.includes('invalid password') ||
+    rawMessage.includes('bad credentials')
   ) {
     return {
       message: 'Incorrect email or password.',
@@ -176,6 +182,66 @@ export function mapSignInError(error: any): MappedAuthError {
 
   return {
     message: error.message || 'Incorrect email or password.',
+    code: 'UNKNOWN',
+  };
+}
+
+/**
+ * Maps Supabase / connection errors during Resend Confirmation to user-friendly messages.
+ */
+export function mapResendError(error: any): MappedAuthError {
+  if (!error) {
+    return {
+      message: 'Failed to resend confirmation email. Please try again.',
+      code: 'UNKNOWN',
+    };
+  }
+
+  const rawMessage = (typeof error === 'string' ? error : error.message || '').toLowerCase();
+  const status = error.status || error.statusCode;
+
+  // Rate limiting
+  if (
+    status === 429 ||
+    rawMessage.includes('rate limit') ||
+    rawMessage.includes('too many requests') ||
+    rawMessage.includes('over_email_send_rate_limit') ||
+    rawMessage.includes('over_request_rate_limit')
+  ) {
+    return {
+      message: 'Too many attempts. Please wait a moment and try again.',
+      code: 'RATE_LIMITED',
+    };
+  }
+
+  // Network issue
+  if (
+    rawMessage.includes('fetch') ||
+    rawMessage.includes('network') ||
+    rawMessage.includes('connection') ||
+    rawMessage.includes('failed to fetch') ||
+    rawMessage.includes('timeout') ||
+    rawMessage.includes('offline') ||
+    status === 0 ||
+    status === 503 ||
+    status === 504
+  ) {
+    return {
+      message: 'Unable to connect to the authentication server. Please check your network connection and try again.',
+      code: 'NETWORK_ERROR',
+    };
+  }
+
+  // Already confirmed
+  if (rawMessage.includes('already confirmed') || rawMessage.includes('already verified')) {
+    return {
+      message: 'This email is already confirmed. Please sign in.',
+      code: 'UNKNOWN',
+    };
+  }
+
+  return {
+    message: error.message || 'Failed to resend confirmation email. Please try again.',
     code: 'UNKNOWN',
   };
 }
@@ -197,6 +263,7 @@ export function mapSignUpError(error: any): MappedAuthError {
 
   // Duplicate email detection
   if (
+    error?.code === 'user_already_exists' ||
     rawMessage.includes('already registered') ||
     rawMessage.includes('already in use') ||
     rawMessage.includes('user_already_exists') ||
@@ -211,12 +278,13 @@ export function mapSignUpError(error: any): MappedAuthError {
 
   // Password complexity / length rules
   if (
-    rawMessage.includes('password') &&
-    (rawMessage.includes('weak') ||
-      rawMessage.includes('short') ||
-      rawMessage.includes('at least') ||
-      rawMessage.includes('character') ||
-      rawMessage.includes('pwned'))
+    error?.code === 'weak_password' ||
+    (rawMessage.includes('password') &&
+      (rawMessage.includes('weak') ||
+        rawMessage.includes('short') ||
+        rawMessage.includes('at least') ||
+        rawMessage.includes('character') ||
+        rawMessage.includes('pwned')))
   ) {
     return {
       message: 'Password is too weak. Please use at least 6 characters including letters and numbers.',
@@ -229,7 +297,8 @@ export function mapSignUpError(error: any): MappedAuthError {
     status === 429 ||
     rawMessage.includes('rate limit') ||
     rawMessage.includes('too many requests') ||
-    rawMessage.includes('over_email_send_rate_limit')
+    rawMessage.includes('over_email_send_rate_limit') ||
+    rawMessage.includes('over_request_rate_limit')
   ) {
     return {
       message: 'Too many attempts. Please wait a moment and try again.',
@@ -242,7 +311,12 @@ export function mapSignUpError(error: any): MappedAuthError {
     rawMessage.includes('fetch') ||
     rawMessage.includes('network') ||
     rawMessage.includes('connection') ||
-    rawMessage.includes('failed to fetch')
+    rawMessage.includes('failed to fetch') ||
+    rawMessage.includes('timeout') ||
+    rawMessage.includes('offline') ||
+    status === 0 ||
+    status === 503 ||
+    status === 504
   ) {
     return {
       message: 'Unable to connect to the authentication server. Please check your network connection and try again.',
@@ -252,6 +326,8 @@ export function mapSignUpError(error: any): MappedAuthError {
 
   // Invalid email format (server-side)
   if (
+    error?.code === 'invalid_email' ||
+    error?.code === 'validation_failed' ||
     rawMessage.includes('invalid email') ||
     rawMessage.includes('invalid format') ||
     rawMessage.includes('unable to validate email')

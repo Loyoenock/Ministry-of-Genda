@@ -271,17 +271,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return;
-      setSession(newSession);
+      try {
+        setSession(newSession);
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (newSession?.user) {
-          await fetchOrCreateProfile(newSession.user);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          if (newSession?.user) {
+            await fetchOrCreateProfile(newSession.user);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setActualRole('interviewer');
+          setActiveRole('interviewer');
+          setLoading(false);
         }
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setActualRole('interviewer');
-        setActiveRole('interviewer');
-        setLoading(false);
+      } catch (authChangeErr) {
+        console.error('Error during onAuthStateChange handling:', authChangeErr);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
 
@@ -496,7 +503,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         // If session exists (email confirmation disabled in Supabase project), user is logged in immediately
         if (data.session) {
-          await fetchOrCreateProfile(data.user);
+          setSession(data.session);
+          try {
+            await fetchOrCreateProfile(data.user);
+          } catch (profileErr) {
+            console.error('fetchOrCreateProfile error during immediate signup session:', profileErr);
+          }
+          setLoading(false);
           setAuthError(null);
           return { error: null, needsConfirmation: false };
         } else {
@@ -508,7 +521,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setLoading(false);
-      return { error: null, needsConfirmation: true };
+      const fallbackErr = new Error('Registration could not be completed. Please try again.');
+      setAuthError(fallbackErr.message);
+      return { error: fallbackErr, code: 'UNKNOWN' };
     } catch (err: any) {
       setLoading(false);
       const mapped = mapSignUpError(err);
@@ -521,18 +536,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Logout from real Supabase
    */
   const logout = async (): Promise<void> => {
-    if (isSupabaseConfigured && session) {
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.warn('Sign out warning:', err);
+    try {
+      if (isSupabaseConfigured && session) {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.warn('Supabase sign out error:', error.message);
+        }
       }
+    } catch (err) {
+      console.warn('Sign out exception:', err);
+    } finally {
+      setCurrentUser(null);
+      setSession(null);
+      setActualRole('interviewer');
+      setActiveRole('interviewer');
     }
-
-    setCurrentUser(null);
-    setSession(null);
-    setActualRole('interviewer');
-    setActiveRole('interviewer');
   };
 
   /**

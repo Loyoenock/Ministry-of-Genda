@@ -16,7 +16,12 @@ import {
   isAllowedEmail,
   UNAUTHORIZED_DOMAIN_MESSAGE,
 } from '../lib/validation';
-import { mapSignInError, mapSignUpError, getAuthFeedback } from '../lib/authErrorMapper';
+import {
+  mapSignInError,
+  mapSignUpError,
+  mapResendError,
+  getAuthFeedback,
+} from '../lib/authErrorMapper';
 
 describe('Validation Utilities & Domain Restrictions', () => {
   it('correctly validates allowed email domains', () => {
@@ -572,5 +577,119 @@ describe('Centralised Auth Feedback Helper (getAuthFeedback)', () => {
     expect(fb.title).toBe('Confirm your email');
     expect(fb.message).toContain('test@mglsd.go.ug');
     expect(fb.severity).toBe('info');
+  });
+});
+
+describe('mapResendError Utility', () => {
+  it('maps rate-limited resend errors to user-friendly message', () => {
+    const res = mapResendError({ status: 429, message: 'over_email_send_rate_limit' });
+    expect(res.code).toBe('RATE_LIMITED');
+    expect(res.message).toContain('Too many attempts');
+  });
+
+  it('maps network errors during resend', () => {
+    const res = mapResendError({ message: 'Failed to fetch' });
+    expect(res.code).toBe('NETWORK_ERROR');
+    expect(res.message).toContain('Unable to connect to the authentication server');
+  });
+
+  it('maps already confirmed email error during resend', () => {
+    const res = mapResendError({ message: 'Email already confirmed' });
+    expect(res.message).toContain('This email is already confirmed. Please sign in.');
+  });
+});
+
+describe('Login Error Guidance & Enumeration Protection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('informs user to check email and offers resend confirmation when login is rejected due to unconfirmed email', async () => {
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { message: 'Email not confirmed', status: 400, code: 'email_not_confirmed' } as any,
+    });
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    fireEvent.change(screen.getByTestId('login-email'), {
+      target: { value: 'unconfirmed.user@mglsd.go.ug' },
+    });
+    fireEvent.change(screen.getByTestId('login-password'), {
+      target: { value: 'ValidPass123' },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('login-submit-btn'));
+    });
+
+    // Alert should inform user to check inbox
+    const alert = await screen.findByTestId('login-error-alert');
+    expect(alert.textContent).toContain('Please confirm your email before signing in');
+    expect(alert.textContent).toContain('Check your inbox for the confirmation link');
+
+    // Next supported action: Resend confirmation email button must be visible
+    const resendBtn = screen.getByTestId('resend-confirmation-btn');
+    expect(resendBtn).toBeInTheDocument();
+  });
+
+  it('protects against account enumeration on sign-in (treats "user not found" as generic incorrect credentials)', async () => {
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { message: 'User not found', status: 400 } as any,
+    });
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    fireEvent.change(screen.getByTestId('login-email'), {
+      target: { value: 'nonexistent.user@mglsd.go.ug' },
+    });
+    fireEvent.change(screen.getByTestId('login-password'), {
+      target: { value: 'AnyPassword123' },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('login-submit-btn'));
+    });
+
+    const alert = await screen.findByTestId('login-error-alert');
+    // Does NOT say user not found; preserves security posture
+    expect(alert.textContent).toBe('Incorrect email or password.');
+  });
+
+  it('presents retry action on network failure during login', async () => {
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { message: 'Failed to fetch', status: 0 } as any,
+    });
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    fireEvent.change(screen.getByTestId('login-email'), {
+      target: { value: 'officer@mglsd.go.ug' },
+    });
+    fireEvent.change(screen.getByTestId('login-password'), {
+      target: { value: 'ValidPassword123' },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('login-submit-btn'));
+    });
+
+    const alert = await screen.findByTestId('login-error-alert');
+    expect(alert.textContent).toContain('Unable to connect to the authentication server');
+    expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 });

@@ -108,4 +108,134 @@ describe('Sign-up & Email Confirmation Flow', () => {
     expect(screen.getByTestId('login-error-alert')).toBeInTheDocument();
     expect(screen.getByText(/An account with this email already exists/i)).toBeInTheDocument();
   });
+
+  it('distinguishes signup returning an immediate session by omitting the confirmation panel', async () => {
+    (supabase.auth.signUp as any).mockResolvedValueOnce({
+      data: {
+        user: { id: 'usr-immediate', email: 'officer.auto@mglsd.go.ug', identities: [{ id: '1' }] },
+        session: { access_token: 'fake-token', user: { id: 'usr-immediate' } },
+      },
+      error: null,
+    });
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('login-tab-signup'));
+    });
+
+    fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Auto Officer' } });
+    fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'officer.auto@mglsd.go.ug' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('login-submit-btn'));
+    });
+
+    // Confirmation panel should NOT be shown
+    expect(screen.queryByTestId('login-confirmation-panel')).toBeNull();
+    // Immediate success alert should be shown
+    expect(screen.getByTestId('login-success-alert')).toBeInTheDocument();
+    expect(screen.getByText(/Account registered successfully/i)).toBeInTheDocument();
+  });
+
+  it('makes resend-confirmation success and failure visible in the UI', async () => {
+    (supabase.auth.signUp as any).mockResolvedValueOnce({
+      data: {
+        user: { id: 'usr-resend-test', email: 'officer.resend@mglsd.go.ug', identities: [{ id: '1' }] },
+        session: null,
+      },
+      error: null,
+    });
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByTestId('login-tab-signup'));
+    });
+
+    fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Resend Officer' } });
+    fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'officer.resend@mglsd.go.ug' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('login-submit-btn'));
+    });
+
+    // Confirmation panel is displayed
+    const resendBtn = screen.getByTestId('resend-confirmation-btn');
+    expect(resendBtn).toBeInTheDocument();
+
+    // 1. Successful resend
+    (supabase.auth.resend as any).mockResolvedValueOnce({ error: null });
+    await act(async () => {
+      fireEvent.click(resendBtn);
+    });
+
+    expect(screen.getByTestId('login-success-alert')).toBeInTheDocument();
+    expect(screen.getByText(/Confirmation email sent again/i)).toBeInTheDocument();
+
+    // 2. Failed resend (e.g. rate limit)
+    (supabase.auth.resend as any).mockResolvedValueOnce({
+      error: { message: 'over_email_send_rate_limit', status: 429 },
+    });
+    await act(async () => {
+      fireEvent.click(resendBtn);
+    });
+
+    expect(screen.getByTestId('login-error-alert')).toBeInTheDocument();
+    expect(screen.getByText(/Too many attempts/i)).toBeInTheDocument();
+  });
+
+  it('does not swallow empty signup response as successful signup', async () => {
+    function SignUpConsumer() {
+      const { signUp } = useAuth();
+      const [outcome, setOutcome] = React.useState<string | null>(null);
+
+      return (
+        <div>
+          <button
+            data-testid="test-empty-signup"
+            onClick={async () => {
+              const res = await signUp('empty@mglsd.go.ug', 'password123', 'Empty Officer');
+              if (res.error) {
+                setOutcome(`ERROR: ${res.error.message}`);
+              } else {
+                setOutcome('SUCCESS');
+              }
+            }}
+          >
+            Trigger
+          </button>
+          <div data-testid="signup-outcome">{outcome}</div>
+        </div>
+      );
+    }
+
+    (supabase.auth.signUp as any).mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: null,
+    });
+
+    render(
+      <AuthProvider>
+        <SignUpConsumer />
+      </AuthProvider>
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('test-empty-signup'));
+    });
+
+    expect(screen.getByTestId('signup-outcome').textContent).toContain('ERROR');
+    expect(screen.getByTestId('signup-outcome').textContent).not.toBe('SUCCESS');
+  });
 });
