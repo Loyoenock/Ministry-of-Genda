@@ -19,7 +19,7 @@ export const ProfileView: React.FC = () => {
   }
 
   const [fullName, setFullName] = useState(user.full_name);
-  const [phone, setPhone] = useState(user.phone_number || '+256 772 458 921');
+  const [phone, setPhone] = useState(user.phone_number || '');
   const [department, setDepartment] = useState(user.department_unit);
   const [savedMessage, setSavedMessage] = useState(false);
 
@@ -143,8 +143,8 @@ export const ProfileView: React.FC = () => {
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <p className="text-xs font-bold">Interviewer Mode (John Okello)</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Views & manages only his assigned interviews.</p>
+            <p className="text-xs font-bold">Interviewer Mode</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Views & manages only your assigned interviews.</p>
           </button>
 
           <button
@@ -155,7 +155,7 @@ export const ProfileView: React.FC = () => {
                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <p className="text-xs font-bold">Admin Mode (Florence Nsubuga)</p>
+            <p className="text-xs font-bold">Admin Mode</p>
             <p className="text-[11px] text-slate-400 mt-0.5">National oversight, all interviews, analytics & user management.</p>
           </button>
         </div>

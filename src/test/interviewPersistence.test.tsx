@@ -185,17 +185,37 @@ describe('InterviewContext Supabase Persistence & State Operations', () => {
         return b;
       }
       if (table === 'interviews') {
-        const b = createMockQueryBuilder({ id: 'int-test-1' });
+        const b = createMockQueryBuilder([]);
         b.insert = vi.fn((payload: any) =>
-          createMockQueryBuilder({ id: payload.id || 'int-test-1', ...payload })
+          createMockQueryBuilder([{ id: payload.id || 'int-test-1', ...payload }])
         );
         return b;
       }
       if (table === 'documents_checklist') {
-        return createMockQueryBuilder([]);
+        const b = createMockQueryBuilder([]);
+        b.insert = vi.fn((rows: any) => {
+          const list = Array.isArray(rows) ? rows : [rows];
+          return createMockQueryBuilder(list.map((r: any, i: number) => ({ id: `doc-${i}`, ...r })));
+        });
+        return b;
       }
       if (table === 'interviewer_notes') {
-        return createMockQueryBuilder(null);
+        const defaultNote = {
+          id: 'note-test-1',
+          interview_id: 'int-test-1',
+          observations: '',
+          numbers_captured: {},
+          maturity_signals: {},
+          updated_at: new Date().toISOString(),
+        };
+        const b = createMockQueryBuilder(defaultNote);
+        b.insert = vi.fn((payload: any) =>
+          createMockQueryBuilder({ ...defaultNote, ...payload })
+        );
+        b.upsert = vi.fn((payload: any) =>
+          createMockQueryBuilder({ ...defaultNote, ...payload })
+        );
+        return b;
       }
       if (table === 'questions') {
         return createMockQueryBuilder(MASTER_QUESTIONS);

@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useInterviews } from '../context/InterviewContext';
 import { Bell, ChevronDown, ShieldCheck, UserCheck, LogOut, Sparkles, CheckCircle2, Menu, X, RefreshCw } from 'lucide-react';
 import { refreshQuestionsCache } from '../lib/questionsService';
 
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   isMobileNavOpen = false,
 }) => {
   const { user, role, actualRole, switchRole, logout, isSupabaseConfigured } = useAuth();
+  const { recentActivities } = useInterviews();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -113,31 +115,35 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="View notifications"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#0b132b] animate-pulse" />
+              {recentActivities.length > 0 && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#0b132b] animate-pulse" />
+              )}
             </button>
 
             {showNotifications && (
               <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] bg-white rounded-xl shadow-2xl border border-slate-200 py-2 text-slate-800 z-50 animate-in fade-in-50 zoom-in-95">
                 <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                   <span className="font-semibold text-xs text-slate-900">System Notifications</span>
-                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">3 New</span>
+                  <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-medium">
+                    {recentActivities.length} Recent
+                  </span>
                 </div>
                 <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                  <div className="px-4 py-2.5 hover:bg-slate-50 text-xs">
-                    <p className="font-medium text-slate-800">Interview Scheduled</p>
-                    <p className="text-slate-500 text-[11px]">Labour Directorate session confirmed for today at 2:30 PM.</p>
-                    <span className="text-[10px] text-slate-400">10 mins ago</span>
-                  </div>
-                  <div className="px-4 py-2.5 hover:bg-slate-50 text-xs">
-                    <p className="font-medium text-slate-800">Document Uploaded</p>
-                    <p className="text-slate-500 text-[11px]">Strategic Plan 2020-2025 verified by Registry.</p>
-                    <span className="text-[10px] text-slate-400">2 hours ago</span>
-                  </div>
-                  <div className="px-4 py-2.5 hover:bg-slate-50 text-xs">
-                    <p className="font-medium text-slate-800">Diagnostic Sync</p>
-                    <p className="text-slate-500 text-[11px]">Master catalogue v2.4 initialized with 56 diagnostic questions.</p>
-                    <span className="text-[10px] text-slate-400">1 day ago</span>
-                  </div>
+                  {recentActivities.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-xs text-slate-400">
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    recentActivities.slice(0, 5).map((act) => (
+                      <div key={act.id} className="px-4 py-2.5 hover:bg-slate-50 text-xs">
+                        <p className="font-medium text-slate-800">{act.description}</p>
+                        {act.organisation && (
+                          <p className="text-slate-500 text-[11px]">{act.organisation}</p>
+                        )}
+                        <span className="text-[10px] text-slate-400">{act.timestamp}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}

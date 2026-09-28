@@ -111,7 +111,7 @@ export function useChecklistState({
       const previousSnapshot = previousItem ? { ...previousItem } : null;
 
       // 2. Optimistic checklist item update
-      const initialFileUrl = `#demo-${fileName}`;
+      const initialFileUrl = `#file-${fileName}`;
       updateChecklistItem(interviewId, itemNumber, {
         collected_status: 'Collected',
         exists_status: 'Yes',

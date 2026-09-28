@@ -18,7 +18,7 @@ export const UserManagementView: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('interviewer');
   const [newDept, setNewDept] = useState('Labour Directorate');
-  const [newPhone, setNewPhone] = useState('+256 700 000 000');
+  const [newPhone, setNewPhone] = useState('');
 
   const filteredUsers = allUsers.filter(
     (u) =>

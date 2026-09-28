@@ -35,7 +35,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
   const [interviewDate, setInterviewDate] = useState(initialDate || todayIso);
   const [interviewTime, setInterviewTime] = useState('10:00 AM');
   const [location, setLocation] = useState('Ministry Headquarters, Kampala');
-  const [assignedInterviewerId, setAssignedInterviewerId] = useState(user?.id || 'usr-john-okello-001');
+  const [assignedInterviewerId, setAssignedInterviewerId] = useState(user?.id || '');
   const [validationError, setValidationError] = useState('');
 
   React.useEffect(() => {
@@ -97,7 +97,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
       interview_date: interviewDate,
       interview_time: interviewTime,
       location: location.trim(),
-      interviewer_id: assignedInterviewer?.id || user?.id || 'usr-john-okello-001',
+      interviewer_id: assignedInterviewer?.id || user?.id || '',
       interviewer_name: assignedInterviewer?.full_name || user?.full_name || 'Assigned Officer',
       tier,
       status: 'Draft',
