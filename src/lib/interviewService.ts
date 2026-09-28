@@ -289,9 +289,11 @@ export async function updateInterviewInSupabase(
 
     if (error) {
       console.warn('Supabase update interview notice:', error.message);
+      throw new Error(`Failed to update interview: ${error.message}`);
     }
   } catch (err) {
     console.warn('Error updating interview in Supabase:', err);
+    throw err;
   }
 }
 

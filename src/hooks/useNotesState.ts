@@ -10,6 +10,12 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { isUuid, fetchOrInitNotesFromSupabase, saveNotesToSupabase } from '../lib/interviewService';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
 
+interface PendingNotesSaveItem {
+  interviewId: string;
+  updates: Partial<InterviewerNote>;
+  version: number;
+}
+
 interface UseNotesStateOptions {
   setAutoSaveStatus: (status: AutoSaveStatusType) => void;
 }
@@ -19,10 +25,13 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
   const [notesMap, setNotesMap] = useState<Record<string, InterviewerNote>>({});
 
   const saveNotesTimer = useRef<NodeJS.Timeout | null>(null);
-  const pendingNotesSave = useRef<{ interviewId: string; updates: Partial<InterviewerNote> } | null>(null);
+  const pendingNotesSave = useRef<PendingNotesSaveItem | null>(null);
+  const isMountedRef = useRef<boolean>(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (saveNotesTimer.current) {
         clearTimeout(saveNotesTimer.current);
         saveNotesTimer.current = null;
@@ -48,9 +57,11 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
   }, []);
 
   const removeNotesForInterview = useCallback((interviewId: string) => {
-    if (saveNotesTimer.current) {
-      clearTimeout(saveNotesTimer.current);
-      saveNotesTimer.current = null;
+    if (pendingNotesSave.current?.interviewId === interviewId) {
+      if (saveNotesTimer.current) {
+        clearTimeout(saveNotesTimer.current);
+        saveNotesTimer.current = null;
+      }
       pendingNotesSave.current = null;
     }
     setNotesMap((prev) => {
@@ -84,19 +95,42 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
       saveNotesTimer.current = null;
     }
 
-    const { interviewId: targetId, updates } = pendingNotesSave.current;
-    pendingNotesSave.current = null;
+    const itemToFlush = pendingNotesSave.current;
+    const targetId = itemToFlush.interviewId;
+    const updatesToPersist = { ...itemToFlush.updates };
 
-    if (isSupabaseConfigured && isUuid(targetId)) {
-      try {
-        await saveNotesToSupabase(targetId, updates);
-        setAutoSaveStatus('saved');
-      } catch (err) {
-        setAutoSaveStatus('error');
-        throw err;
+    if (!isSupabaseConfigured || !isUuid(targetId)) {
+      if (pendingNotesSave.current?.version === itemToFlush.version) {
+        pendingNotesSave.current = null;
       }
-    } else {
       setAutoSaveStatus('saved');
+      return;
+    }
+
+    setAutoSaveStatus('saving');
+    try {
+      await saveNotesToSupabase(targetId, updatesToPersist);
+
+      if (pendingNotesSave.current?.version === itemToFlush.version) {
+        pendingNotesSave.current = null;
+      } else if (pendingNotesSave.current?.interviewId === targetId) {
+        const remaining: Partial<InterviewerNote> = {};
+        let hasRemaining = false;
+        for (const [k, v] of Object.entries(pendingNotesSave.current.updates)) {
+          if (updatesToPersist[k as keyof InterviewerNote] !== v) {
+            (remaining as any)[k] = v;
+            hasRemaining = true;
+          }
+        }
+        pendingNotesSave.current = hasRemaining
+          ? { ...pendingNotesSave.current, updates: remaining }
+          : null;
+      }
+      setAutoSaveStatus('saved');
+    } catch (err) {
+      console.error('[notes] flush failed', err);
+      setAutoSaveStatus('error');
+      throw err;
     }
   }, [setAutoSaveStatus]);
 
@@ -104,9 +138,8 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     async (interviewId: string, updates: Partial<InterviewerNote>): Promise<void> => {
       setAutoSaveStatus('saving');
 
-      let previousNote: InterviewerNote | undefined;
       setNotesMap((prev) => {
-        previousNote = prev[interviewId] || createInitialNotes(interviewId);
+        const previousNote = prev[interviewId] || createInitialNotes(interviewId);
         const updatedNote: InterviewerNote = {
           ...previousNote,
           ...updates,
@@ -118,31 +151,74 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
         };
       });
 
-      pendingNotesSave.current = { interviewId, updates };
+      const currentPending =
+        pendingNotesSave.current?.interviewId === interviewId
+          ? pendingNotesSave.current.updates
+          : {};
+      const currentVersion =
+        pendingNotesSave.current?.interviewId === interviewId
+          ? pendingNotesSave.current.version
+          : 0;
+      const nextVersion = currentVersion + 1;
+      const mergedUpdates = { ...currentPending, ...updates };
+
+      const saveItem: PendingNotesSaveItem = {
+        interviewId,
+        updates: mergedUpdates,
+        version: nextVersion,
+      };
+      pendingNotesSave.current = saveItem;
 
       if (saveNotesTimer.current) {
         clearTimeout(saveNotesTimer.current);
+        saveNotesTimer.current = null;
       }
 
       saveNotesTimer.current = setTimeout(async () => {
         saveNotesTimer.current = null;
-        pendingNotesSave.current = null;
+        if (!isMountedRef.current) return;
 
-        if (isSupabaseConfigured && isUuid(interviewId)) {
-          try {
-            await saveNotesToSupabase(interviewId, updates);
+        if (!isSupabaseConfigured || !isUuid(interviewId)) {
+          // Local/demo mode: save succeeds in memory after debounce window
+          if (pendingNotesSave.current?.version === saveItem.version) {
+            pendingNotesSave.current = null;
+          }
+          setAutoSaveStatus('saved');
+          return;
+        }
+
+        const updatesToPersist = { ...saveItem.updates };
+
+        try {
+          await saveNotesToSupabase(interviewId, updatesToPersist);
+          if (!isMountedRef.current) return;
+
+          if (pendingNotesSave.current?.version === saveItem.version) {
+            pendingNotesSave.current = null;
             setAutoSaveStatus('saved');
-          } catch (err) {
-            if (previousNote) {
-              setNotesMap((prev) => ({
-                ...prev,
-                [interviewId]: previousNote!,
-              }));
+          } else if (pendingNotesSave.current?.interviewId === interviewId) {
+            // Remove persisted keys while retaining any newer edits
+            const remaining: Partial<InterviewerNote> = {};
+            let hasRemaining = false;
+            for (const [k, v] of Object.entries(pendingNotesSave.current.updates)) {
+              if (updatesToPersist[k as keyof InterviewerNote] !== v) {
+                (remaining as any)[k] = v;
+                hasRemaining = true;
+              }
             }
+            pendingNotesSave.current = hasRemaining
+              ? { ...pendingNotesSave.current, updates: remaining }
+              : null;
+            if (!pendingNotesSave.current) {
+              setAutoSaveStatus('saved');
+            }
+          }
+        } catch (err) {
+          console.error('[notes] persist failed', err);
+          if (isMountedRef.current) {
             setAutoSaveStatus('error');
           }
-        } else {
-          setAutoSaveStatus('saved');
+          // pendingNotesSave.current is kept for retry!
         }
       }, 500);
     },
