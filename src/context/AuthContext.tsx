@@ -34,7 +34,9 @@ export interface AuthContextType {
   switchRole: (newRole: UserRole) => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void> | void;
-  addNewUser: (newUser: Omit<UserProfile, 'id'>) => Promise<void> | void;
+  addNewUser: (newUser: Omit<UserProfile, 'id'>) => Promise<{ error: any } | void> | void;
+  adminUpdateUser: (userId: string, updates: Partial<UserProfile>) => Promise<{ error: any }>;
+  adminDeleteUser: (userId: string) => Promise<{ error: any }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -771,14 +773,122 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Add new staff member
+   * Add new staff member (Admin Create User)
    */
   const addNewUser = async (newUser: Omit<UserProfile, 'id'>) => {
-    const user: UserProfile = {
+    const generatedId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const userRecord: UserProfile = {
       ...newUser,
-      id: `usr-${Date.now()}`,
+      id: generatedId,
+      avatar_url:
+        newUser.avatar_url ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     };
-    setUsers((prev) => [...prev, user]);
+
+    if (isSupabaseConfigured && actualRole === 'admin') {
+      try {
+        const { error } = await supabase.from('profiles').insert({
+          id: generatedId,
+          email: userRecord.email,
+          full_name: userRecord.full_name,
+          role: userRecord.role,
+          department_unit: userRecord.department_unit,
+          phone_number: userRecord.phone_number || null,
+          avatar_url: userRecord.avatar_url,
+        });
+        if (error) {
+          console.warn('Notice adding user to Supabase:', error.message);
+        }
+      } catch (err) {
+        console.error('Error adding user to Supabase:', err);
+      }
+    }
+
+    setUsers((prev) => [...prev, userRecord]);
+    return { error: null };
+  };
+
+  /**
+   * Admin Update User
+   */
+  const adminUpdateUser = async (userId: string, updates: Partial<UserProfile>) => {
+    const prevUsers = users;
+    const prevCurrentUser = currentUser;
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, ...updates } : u))
+    );
+
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, ...updates } : null));
+      if (updates.role) {
+        setActualRole(updates.role);
+        setActiveRole(updates.role);
+      }
+    }
+
+    if (isSupabaseConfigured && actualRole === 'admin') {
+      try {
+        const updatePayload: any = {};
+        if (updates.full_name !== undefined) updatePayload.full_name = updates.full_name;
+        if (updates.email !== undefined) updatePayload.email = updates.email;
+        if (updates.department_unit !== undefined) updatePayload.department_unit = updates.department_unit;
+        if (updates.phone_number !== undefined) updatePayload.phone_number = updates.phone_number || null;
+        if (updates.role !== undefined) updatePayload.role = updates.role;
+        if (updates.avatar_url !== undefined) updatePayload.avatar_url = updates.avatar_url;
+
+        const { error } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', userId);
+        if (error) {
+          console.error('Error updating user in Supabase:', error.message);
+          setUsers(prevUsers);
+          setCurrentUser(prevCurrentUser);
+          triggerError('Failed to update user in Supabase: ' + error.message);
+          return { error };
+        }
+      } catch (err: any) {
+        console.error('Error updating user in Supabase:', err);
+        setUsers(prevUsers);
+        setCurrentUser(prevCurrentUser);
+        triggerError('Failed to update user');
+        return { error: err };
+      }
+    }
+    return { error: null };
+  };
+
+  /**
+   * Admin Delete User
+   */
+  const adminDeleteUser = async (userId: string) => {
+    if (currentUser && currentUser.id === userId) {
+      const err = new Error('You cannot delete your own active account.');
+      triggerError(err.message);
+      return { error: err };
+    }
+
+    const prevUsers = users;
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+
+    if (isSupabaseConfigured && actualRole === 'admin') {
+      try {
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        if (error) {
+          console.error('Error deleting user in Supabase:', error.message);
+          setUsers(prevUsers);
+          triggerError('Failed to delete user in Supabase: ' + error.message);
+          return { error };
+        }
+      } catch (err: any) {
+        console.error('Error deleting user in Supabase:', err);
+        setUsers(prevUsers);
+        triggerError('Failed to delete user');
+        return { error: err };
+      }
+    }
+    return { error: null };
   };
 
   const effectiveRole = activeRole;
@@ -804,6 +914,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfile,
         updateUserRole,
         addNewUser,
+        adminUpdateUser,
+        adminDeleteUser,
         authError,
       }}
     >
