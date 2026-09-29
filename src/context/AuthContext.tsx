@@ -8,7 +8,7 @@ import { UserProfile, UserRole } from '../types';
 import { INITIAL_CURRENT_USER, ADMIN_USER } from '../lib/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
-import { mapSignInError, mapSignUpError, AuthErrorCode } from '../lib/authErrorMapper';
+import { mapSignInError, mapSignUpError, mapResendError, AuthErrorCode } from '../lib/authErrorMapper';
 import { isAllowedEmail, UNAUTHORIZED_DOMAIN_MESSAGE } from '../lib/validation';
 
 export interface AuthContextType {
@@ -28,6 +28,8 @@ export interface AuthContextType {
     fullName: string,
     department?: string
   ) => Promise<{ error: any; needsConfirmation?: boolean; code?: AuthErrorCode }>;
+  resetPassword: (email: string) => Promise<{ error: any; code?: AuthErrorCode }>;
+  updatePassword: (newPassword: string) => Promise<{ error: any; code?: AuthErrorCode }>;
   logout: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void> | void;
@@ -501,23 +503,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data?.user) {
-        // If session exists (email confirmation disabled in Supabase project), user is logged in immediately
+        // Ensure upon signup of a new account the user is requested to confirm their email before login:
+        // Even if Supabase returns an immediate session, sign out so confirmation is required before login.
         if (data.session) {
-          setSession(data.session);
           try {
             await fetchOrCreateProfile(data.user);
           } catch (profileErr) {
-            console.error('fetchOrCreateProfile error during immediate signup session:', profileErr);
+            console.error('fetchOrCreateProfile error during signup:', profileErr);
           }
-          setLoading(false);
-          setAuthError(null);
-          return { error: null, needsConfirmation: false };
-        } else {
-          // Confirmation email was sent; user needs to confirm
-          setLoading(false);
-          setAuthError(null);
-          return { error: null, needsConfirmation: true };
+          if (typeof supabase.auth?.signOut === 'function') {
+            await supabase.auth.signOut().catch(() => {});
+          }
         }
+        setSession(null);
+        setCurrentUser(null);
+        setLoading(false);
+        setAuthError(null);
+        return { error: null, needsConfirmation: true };
       }
 
       setLoading(false);
@@ -529,6 +531,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const mapped = mapSignUpError(err);
       setAuthError(mapped.message);
       return { error: new Error(mapped.message), code: mapped.code };
+    }
+  };
+
+  /**
+   * Send Password Reset Email
+   */
+  const resetPassword = async (email: string): Promise<{ error: any; code?: AuthErrorCode }> => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      const err = new Error('Please enter your email address.');
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
+
+    if (!isAllowedEmail(trimmedEmail)) {
+      const err = new Error(UNAUTHORIZED_DOMAIN_MESSAGE);
+      setAuthError(err.message);
+      return { error: err, code: 'INVALID_EMAIL' };
+    }
+
+    setAuthError(null);
+
+    if (!isSupabaseConfigured) {
+      return { error: null };
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: `${window.location.origin}`,
+      });
+
+      if (error) {
+        const mapped = mapResendError(error);
+        setAuthError(mapped.message);
+        return { error: new Error(mapped.message), code: mapped.code };
+      }
+
+      setAuthError(null);
+      return { error: null };
+    } catch (err: any) {
+      const mapped = mapResendError(err);
+      setAuthError(mapped.message);
+      return { error: new Error(mapped.message), code: mapped.code };
+    }
+  };
+
+  /**
+   * Update User Password (e.g. after recovery flow)
+   */
+  const updatePassword = async (newPassword: string): Promise<{ error: any; code?: AuthErrorCode }> => {
+    const trimmedPassword = newPassword.trim();
+
+    if (trimmedPassword.length < 6) {
+      const err = new Error('Password must be at least 6 characters long.');
+      setAuthError(err.message);
+      return { error: err, code: 'WEAK_PASSWORD' };
+    }
+
+    setAuthError(null);
+
+    if (!isSupabaseConfigured) {
+      return { error: null };
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: trimmedPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return { error: new Error(error.message), code: 'UNKNOWN' };
+      }
+
+      setAuthError(null);
+      return { error: null };
+    } catch (err: any) {
+      setAuthError(err.message);
+      return { error: new Error(err.message), code: 'UNKNOWN' };
     }
   };
 
@@ -695,6 +777,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         allUsers: users,
         login,
         signUp,
+        resetPassword,
+        updatePassword,
         logout,
         switchRole,
         updateProfile,

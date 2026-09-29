@@ -109,7 +109,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
     expect(screen.getByText(/An account with this email already exists/i)).toBeInTheDocument();
   });
 
-  it('distinguishes signup returning an immediate session by omitting the confirmation panel', async () => {
+  it('requests the user to confirm their email upon signup even if a session was returned', async () => {
     (supabase.auth.signUp as any).mockResolvedValueOnce({
       data: {
         user: { id: 'usr-immediate', email: 'officer.auto@mglsd.go.ug', identities: [{ id: '1' }] },
@@ -136,11 +136,10 @@ describe('Sign-up & Email Confirmation Flow', () => {
       fireEvent.click(screen.getByTestId('login-submit-btn'));
     });
 
-    // Confirmation panel should NOT be shown
-    expect(screen.queryByTestId('login-confirmation-panel')).toBeNull();
-    // Immediate success alert should be shown
+    // Confirmation panel should be shown requesting email confirmation
+    expect(screen.getByTestId('login-confirmation-panel')).toBeInTheDocument();
     expect(screen.getByTestId('login-success-alert')).toBeInTheDocument();
-    expect(screen.getByText(/Account registered successfully/i)).toBeInTheDocument();
+    expect(screen.getByText(/confirm your account before logging in/i)).toBeInTheDocument();
   });
 
   it('makes resend-confirmation success and failure visible in the UI', async () => {

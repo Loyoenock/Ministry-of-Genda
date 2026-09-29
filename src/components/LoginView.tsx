@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Lock,
@@ -17,16 +17,38 @@ import {
   Sparkles,
   Info,
   RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { validateEmail, validatePassword, validateFullName } from '../lib/validation';
 import { AuthErrorCode, mapResendError, mapSignInError, mapSignUpError } from '../lib/authErrorMapper';
 import { supabase } from '../lib/supabase';
 
 export const LoginView: React.FC = () => {
-  const { login, signUp } = useAuth();
+  const { login, signUp, resetPassword, updatePassword } = useAuth();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
+
+  useEffect(() => {
+    // Check if user arrived via password recovery link in URL
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+      setMode('reset');
+      setSuccessMessage('Please enter your new password below to update your account.');
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('reset');
+        setSuccessMessage('Please enter your new password below to update your account.');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -170,7 +192,7 @@ export const LoginView: React.FC = () => {
   };
 
   // Switch between tabs while preserving the email field
-  const handleSwitchTab = (newMode: 'signin' | 'signup') => {
+  const handleSwitchTab = (newMode: 'signin' | 'signup' | 'forgot' | 'reset') => {
     setMode(newMode);
     setErrorMessage(null);
     setErrorCode(null);
@@ -180,7 +202,7 @@ export const LoginView: React.FC = () => {
     setTouched({});
 
     // Keep email validation status accurate if email is populated
-    if (email.trim()) {
+    if (email.trim() && (newMode === 'signin' || newMode === 'signup' || newMode === 'forgot')) {
       const result = validateEmail(email);
       setEmailWarning(result.isValid ? result.warningMessage || null : null);
     } else {
@@ -205,6 +227,71 @@ export const LoginView: React.FC = () => {
     setErrorMessage(null);
     setErrorCode(null);
     setSuccessMessage(null);
+
+    // 1. Password Reset Request Flow (Forgot Password)
+    if (mode === 'forgot') {
+      setTouched({ email: true });
+      const emailResult = validateEmail(email);
+      if (!emailResult.isValid) {
+        setFieldErrors((prev) => ({ ...prev, email: emailResult.errorMessage }));
+        return;
+      }
+      setFieldErrors((prev) => ({ ...prev, email: undefined }));
+      setEmailWarning(emailResult.warningMessage || null);
+
+      setIsSubmitting(true);
+      try {
+        const { error, code } = await resetPassword(email);
+        if (error) {
+          setErrorMessage(error.message || 'Failed to send password reset email. Please try again.');
+          setErrorCode(code || null);
+        } else {
+          setSuccessMessage(
+            'Password reset link has been sent to your email. Please check your inbox and follow the instructions to reset your password.'
+          );
+          setErrorMessage(null);
+          setErrorCode(null);
+        }
+      } catch (err: any) {
+        const mapped = mapResendError(err);
+        setErrorMessage(mapped.message);
+        setErrorCode(mapped.code);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // 2. Password Update Flow (Reset Password after receiving link)
+    if (mode === 'reset') {
+      setTouched({ password: true });
+      const passwordResult = validatePassword(password, true);
+      if (!passwordResult.isValid) {
+        setFieldErrors((prev) => ({ ...prev, password: passwordResult.errorMessage }));
+        return;
+      }
+      setFieldErrors((prev) => ({ ...prev, password: undefined }));
+
+      setIsSubmitting(true);
+      try {
+        const { error, code } = await updatePassword(password);
+        if (error) {
+          setErrorMessage(error.message || 'Failed to update password. Please try again.');
+          setErrorCode(code || null);
+        } else {
+          setSuccessMessage('Password updated successfully! You can now sign in with your new password.');
+          setMode('signin');
+          setPassword('');
+          setErrorMessage(null);
+          setErrorCode(null);
+        }
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Failed to update password. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     // Mark fields as touched
     setTouched({
@@ -248,7 +335,11 @@ export const LoginView: React.FC = () => {
         if (error) {
           setErrorMessage(error.message || 'Incorrect email or password.');
           setErrorCode(code || null);
-          setIsConfirmationRequired(false);
+          if (code === 'EMAIL_NOT_CONFIRMED') {
+            setIsConfirmationRequired(true);
+          } else {
+            setIsConfirmationRequired(false);
+          }
         } else {
           setErrorMessage(null);
           setErrorCode(null);
@@ -267,15 +358,10 @@ export const LoginView: React.FC = () => {
           );
           setErrorCode(code || null);
           setIsConfirmationRequired(false);
-        } else if (needsConfirmation) {
+        } else {
           setIsConfirmationRequired(true);
           setSuccessMessage(
-            'Account created successfully. Please check your inbox to confirm your email before signing in.'
-          );
-        } else {
-          setIsConfirmationRequired(false);
-          setSuccessMessage(
-            'Account registered successfully! Welcome to the MGLSD Diagnostic workspace.'
+            'Account created successfully. Please check your inbox to confirm your account before logging in.'
           );
         }
       }
@@ -349,37 +435,85 @@ export const LoginView: React.FC = () => {
 
           {/* Authentication Form Card */}
           <div className="bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200/80 p-6 sm:p-8 space-y-6">
-            {/* Mode Switcher Tabs */}
-            <div className="flex border-b border-slate-100 pb-3 gap-2">
-              <button
-                type="button"
-                id="login-tab-signin"
-                data-testid="login-tab-signin"
-                onClick={() => handleSwitchTab('signin')}
-                disabled={isSubmitting}
-                className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition ${
-                  mode === 'signin'
-                    ? 'border-teal-700 text-teal-800'
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
-                } disabled:opacity-50`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                id="login-tab-signup"
-                data-testid="login-tab-signup"
-                onClick={() => handleSwitchTab('signup')}
-                disabled={isSubmitting}
-                className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition ${
-                  mode === 'signup'
-                    ? 'border-teal-700 text-teal-800'
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
-                } disabled:opacity-50`}
-              >
-                Create Account
-              </button>
-            </div>
+            {/* Mode Switcher Header / Tabs */}
+            {mode === 'forgot' ? (
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <KeyRound className="w-4 h-4 text-teal-700" />
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                      Reset Password
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Recover access to your ministry account
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="forgot-back-to-signin-btn"
+                  onClick={() => handleSwitchTab('signin')}
+                  disabled={isSubmitting}
+                  className="text-xs font-semibold text-teal-700 hover:text-teal-800 hover:underline transition"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            ) : mode === 'reset' ? (
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Lock className="w-4 h-4 text-teal-700" />
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                      Set New Password
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Update your account credentials
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="reset-back-to-signin-btn"
+                  onClick={() => handleSwitchTab('signin')}
+                  disabled={isSubmitting}
+                  className="text-xs font-semibold text-teal-700 hover:text-teal-800 hover:underline transition"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            ) : (
+              <div className="flex border-b border-slate-100 pb-3 gap-2">
+                <button
+                  type="button"
+                  id="login-tab-signin"
+                  data-testid="login-tab-signin"
+                  onClick={() => handleSwitchTab('signin')}
+                  disabled={isSubmitting}
+                  className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition ${
+                    mode === 'signin'
+                      ? 'border-teal-700 text-teal-800'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  } disabled:opacity-50`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  id="login-tab-signup"
+                  data-testid="login-tab-signup"
+                  onClick={() => handleSwitchTab('signup')}
+                  disabled={isSubmitting}
+                  className={`flex-1 pb-2 text-xs font-bold uppercase tracking-wider text-center border-b-2 transition ${
+                    mode === 'signup'
+                      ? 'border-teal-700 text-teal-800'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  } disabled:opacity-50`}
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
 
             {/* Dedicated Confirmation Required Panel */}
             {isConfirmationRequired && (
@@ -567,128 +701,177 @@ export const LoginView: React.FC = () => {
               )}
 
               {/* Email Address Field */}
-              <div className="space-y-1.5">
-                <label htmlFor="login-email" className="block text-xs font-bold text-slate-700">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="login-email"
-                    data-testid="login-email"
-                    type="email"
-                    autoComplete="email"
-                    disabled={isSubmitting}
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    onBlur={handleEmailBlur}
-                    aria-invalid={!!fieldErrors.email}
-                    aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                    className={`w-full pl-10 pr-3.5 py-2.5 border rounded-xl text-xs outline-none min-h-[42px] transition ${
-                      fieldErrors.email
-                        ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
-                        : 'border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-600 focus:border-transparent'
-                    } disabled:opacity-50`}
-                  />
-                </div>
-                {/* Inline Field Error */}
-                {fieldErrors.email && (
-                  <p
-                    id="email-error"
-                    data-testid="email-error"
-                    className="text-[11px] text-red-600 flex items-center space-x-1 mt-1 font-semibold"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{fieldErrors.email}</span>
-                  </p>
-                )}
-                {/* Soft Domain Guidance Warning */}
-                {!fieldErrors.email && emailWarning && (
-                  <div
-                    data-testid="email-warning"
-                    className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] text-amber-800 flex items-start space-x-2 mt-1.5"
-                  >
-                    <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span className="leading-snug">{emailWarning}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="login-password" className="block text-xs font-bold text-slate-700">
-                    Password <span className="text-red-500">*</span>
+              {mode !== 'reset' && (
+                <div className="space-y-1.5">
+                  <label htmlFor="login-email" className="block text-xs font-bold text-slate-700">
+                    Email Address <span className="text-red-500">*</span>
                   </label>
-                  {mode === 'signup' && (
-                    <span className="text-[10px] text-slate-400">Min 6 characters</span>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="login-email"
+                      data-testid="login-email"
+                      type="email"
+                      autoComplete="email"
+                      disabled={isSubmitting}
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
+                      aria-invalid={!!fieldErrors.email}
+                      aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                      className={`w-full pl-10 pr-3.5 py-2.5 border rounded-xl text-xs outline-none min-h-[42px] transition ${
+                        fieldErrors.email
+                          ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                          : 'border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-600 focus:border-transparent'
+                      } disabled:opacity-50`}
+                    />
+                  </div>
+                  {/* Inline Field Error */}
+                  {fieldErrors.email && (
+                    <p
+                      id="email-error"
+                      data-testid="email-error"
+                      className="text-[11px] text-red-600 flex items-center space-x-1 mt-1 font-semibold"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fieldErrors.email}</span>
+                    </p>
+                  )}
+                  {/* Soft Domain Guidance Warning */}
+                  {!fieldErrors.email && emailWarning && (
+                    <div
+                      data-testid="email-warning"
+                      className="p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] text-amber-800 flex items-start space-x-2 mt-1.5"
+                    >
+                      <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span className="leading-snug">{emailWarning}</span>
+                    </div>
                   )}
                 </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    ref={passwordInputRef}
-                    id="login-password"
-                    data-testid="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                    disabled={isSubmitting}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => handlePasswordChange(e.target.value)}
-                    onBlur={handlePasswordBlur}
-                    aria-invalid={!!fieldErrors.password}
-                    aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-                    className={`w-full pl-10 pr-10 py-2.5 border rounded-xl text-xs outline-none min-h-[42px] transition ${
-                      fieldErrors.password
-                        ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
-                        : 'border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-600 focus:border-transparent'
-                    } disabled:opacity-50`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    disabled={isSubmitting}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 disabled:opacity-50"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+              )}
+
+              {/* Password Field */}
+              {mode !== 'forgot' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="login-password" className="block text-xs font-bold text-slate-700">
+                      {mode === 'reset' ? 'New Password' : 'Password'} <span className="text-red-500">*</span>
+                    </label>
+                    {(mode === 'signup' || mode === 'reset') && (
+                      <span className="text-[10px] text-slate-400">Min 6 characters</span>
+                    )}
+                    {mode === 'signin' && (
+                      <button
+                        type="button"
+                        data-testid="forgot-password-link"
+                        onClick={() => handleSwitchTab('forgot')}
+                        disabled={isSubmitting}
+                        className="text-[11px] font-semibold text-teal-700 hover:text-teal-800 hover:underline transition"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={passwordInputRef}
+                      id="login-password"
+                      data-testid="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                      disabled={isSubmitting}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => handlePasswordChange(e.target.value)}
+                      onBlur={handlePasswordBlur}
+                      aria-invalid={!!fieldErrors.password}
+                      aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                      className={`w-full pl-10 pr-10 py-2.5 border rounded-xl text-xs outline-none min-h-[42px] transition ${
+                        fieldErrors.password
+                          ? 'border-red-400 bg-red-50/20 focus:ring-2 focus:ring-red-400'
+                          : 'border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-600 focus:border-transparent'
+                      } disabled:opacity-50`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      disabled={isSubmitting}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 disabled:opacity-50"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Inline Field Error */}
+                  {fieldErrors.password && (
+                    <p
+                      id="password-error"
+                      data-testid="password-error"
+                      className="text-[11px] text-red-600 flex items-center space-x-1 mt-1 font-semibold"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fieldErrors.password}</span>
+                    </p>
+                  )}
                 </div>
-                {/* Inline Field Error */}
-                {fieldErrors.password && (
-                  <p
-                    id="password-error"
-                    data-testid="password-error"
-                    className="text-[11px] text-red-600 flex items-center space-x-1 mt-1 font-semibold"
-                  >
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{fieldErrors.password}</span>
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* Submit Button */}
               <button
                 type="submit"
                 id="login-submit-btn"
-                data-testid="login-submit-btn"
+                data-testid={
+                  mode === 'forgot'
+                    ? 'forgot-password-submit-btn'
+                    : mode === 'reset'
+                    ? 'reset-password-submit-btn'
+                    : 'login-submit-btn'
+                }
                 disabled={isSubmitting}
                 className="w-full mt-2 py-3 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]"
               >
                 {isSubmitting ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>{mode === 'signin' ? 'Signing in…' : 'Creating account…'}</span>
+                    <span>
+                      {mode === 'signin'
+                        ? 'Signing in…'
+                        : mode === 'signup'
+                        ? 'Creating account…'
+                        : mode === 'forgot'
+                        ? 'Sending reset link…'
+                        : 'Updating password…'}
+                    </span>
                   </div>
                 ) : (
                   <>
-                    <span>{mode === 'signin' ? 'Sign In to Workspace' : 'Create Account'}</span>
+                    <span>
+                      {mode === 'signin'
+                        ? 'Sign In to Workspace'
+                        : mode === 'signup'
+                        ? 'Create Account'
+                        : mode === 'forgot'
+                        ? 'Send Password Reset Link'
+                        : 'Update Password'}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
+
+              {(mode === 'forgot' || mode === 'reset') && (
+                <button
+                  type="button"
+                  data-testid="back-to-signin-link"
+                  onClick={() => handleSwitchTab('signin')}
+                  disabled={isSubmitting}
+                  className="w-full text-center text-xs font-semibold text-teal-800 hover:text-teal-900 hover:underline pt-1 block"
+                >
+                  Back to Sign In
+                </button>
+              )}
             </form>
           </div>
 
