@@ -62,6 +62,7 @@ export interface InterviewContextType {
     updates: Partial<DocumentItem>
   ) => void | Promise<void>;
   getInterviewNotes: (interviewId: string) => InterviewerNote;
+  loadNotesForInterviews?: (interviewIds: string[]) => Promise<void>;
   saveNotes: (interviewId: string, updates: Partial<InterviewerNote>) => void | Promise<void>;
   uploadDocumentFile: (
     interviewId: string,
@@ -208,6 +209,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         getInterviewChecklist: checklistState.getInterviewChecklist,
         updateChecklistItem: checklistState.updateChecklistItem,
         getInterviewNotes: notesState.getInterviewNotes,
+        loadNotesForInterviews: notesState.loadNotesForInterviews,
         saveNotes: notesState.saveNotes,
         uploadDocumentFile,
       }}

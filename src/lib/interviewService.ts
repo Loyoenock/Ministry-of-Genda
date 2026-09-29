@@ -592,6 +592,39 @@ export async function saveNotesToSupabase(
   }
 }
 
+/**
+ * Batch fetch notes for a list of interview IDs
+ */
+export async function fetchNotesForInterviews(
+  interviewIds: string[]
+): Promise<Record<string, InterviewerNote>> {
+  if (!isSupabaseConfigured || interviewIds.length === 0) return {};
+  const validIds = interviewIds.filter(isUuid);
+  if (validIds.length === 0) return {};
+
+  try {
+    let query: any = supabase.from('interviewer_notes').select('*');
+    if (typeof query.in === 'function') {
+      query = query.in('interview_id', validIds);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('Notice: Error fetching batch interviewer notes:', error.message);
+      return {};
+    }
+    const notesMap: Record<string, InterviewerNote> = {};
+    if (Array.isArray(data)) {
+      data.forEach((row) => {
+        notesMap[row.interview_id] = mapRowToInterviewerNote(row);
+      });
+    }
+    return notesMap;
+  } catch (err) {
+    console.warn('Error querying batch notes from Supabase:', err);
+    return {};
+  }
+}
+
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',

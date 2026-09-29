@@ -7,7 +7,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { InterviewerNote } from '../types';
 import { createInitialNotes } from '../lib/mockData';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { isUuid, fetchOrInitNotesFromSupabase, saveNotesToSupabase } from '../lib/interviewService';
+import {
+  isUuid,
+  fetchOrInitNotesFromSupabase,
+  saveNotesToSupabase,
+  fetchNotesForInterviews,
+} from '../lib/interviewService';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
 
 interface PendingNotesSaveItem {
@@ -83,6 +88,21 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
       }
     } catch (err) {
       console.warn('Notice: Error loading notes from Supabase:', err);
+    }
+  }, []);
+
+  const loadNotesForInterviews = useCallback(async (interviewIds: string[]) => {
+    if (!isSupabaseConfigured || interviewIds.length === 0) return;
+    try {
+      const batch = await fetchNotesForInterviews(interviewIds);
+      if (batch && Object.keys(batch).length > 0) {
+        setNotesMap((prev) => ({
+          ...prev,
+          ...batch,
+        }));
+      }
+    } catch (err) {
+      console.warn('Notice: Error loading batch notes from Supabase:', err);
     }
   }, []);
 
@@ -231,6 +251,7 @@ export function useNotesState({ setAutoSaveStatus }: UseNotesStateOptions) {
     initNotesForInterview,
     removeNotesForInterview,
     loadNotesFromSupabase,
+    loadNotesForInterviews,
     saveNotes,
     flushNotesSave,
   };
