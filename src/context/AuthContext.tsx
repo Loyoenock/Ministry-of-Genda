@@ -311,7 +311,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchOrCreateProfile, isTestEnv]);
 
-  // Realtime subscription for profile changes (role and profile updates across tabs/browsers)
+  // Realtime subscription for profile changes (role and profile updates for current user)
   useEffect(() => {
     if (!isSupabaseConfigured || isTestEnv || !currentUser) return;
 
@@ -347,6 +347,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabase.removeChannel(channel);
     };
   }, [isSupabaseConfigured, isTestEnv, currentUser?.id]);
+
+  // Realtime subscription for all profile changes (for Admins to keep User Management live)
+  useEffect(() => {
+    if (!isSupabaseConfigured || isTestEnv || actualRole !== 'admin') return;
+
+    const channel = supabase
+      .channel('admin-all-profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const p = payload.new as any;
+            if (p) {
+              const mappedUser: UserProfile = {
+                id: p.id,
+                email: p.email || '',
+                full_name: p.full_name || '',
+                role: (p.role === 'admin' ? 'admin' : 'interviewer') as UserRole,
+                department_unit: p.department_unit || 'Labour Directorate',
+                phone_number: p.phone_number || undefined,
+                avatar_url: p.avatar_url || undefined,
+              };
+              setUsers((prev) => {
+                if (prev.some((u) => u.id === mappedUser.id)) return prev;
+                return [...prev, mappedUser];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const p = payload.new as any;
+            if (p) {
+              const mappedRole = (p.role === 'admin' ? 'admin' : 'interviewer') as UserRole;
+              setUsers((prev) =>
+                prev.map((u) =>
+                  u.id === p.id
+                    ? {
+                        ...u,
+                        full_name: p.full_name || u.full_name,
+                        email: p.email || u.email,
+                        role: mappedRole,
+                        department_unit: p.department_unit || u.department_unit,
+                        phone_number: p.phone_number || u.phone_number,
+                        avatar_url: p.avatar_url || u.avatar_url,
+                      }
+                    : u
+                )
+              );
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldRecord = payload.old as any;
+            if (oldRecord?.id) {
+              setUsers((prev) => prev.filter((u) => u.id !== oldRecord.id));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSupabaseConfigured, isTestEnv, actualRole]);
 
   /**
    * Real Supabase Sign In
@@ -776,7 +842,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Add new staff member (Admin Create User)
    */
   const addNewUser = async (newUser: Omit<UserProfile, 'id'>) => {
-    const generatedId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const generatedId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
     const userRecord: UserProfile = {
       ...newUser,
       id: generatedId,
@@ -797,10 +867,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           avatar_url: userRecord.avatar_url,
         });
         if (error) {
-          console.warn('Notice adding user to Supabase:', error.message);
+          console.error('Error adding user to Supabase:', error.message);
+          triggerError('Failed to create user in database: ' + error.message);
+          return { error };
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error adding user to Supabase:', err);
+        triggerError('Failed to create user in database');
+        return { error: err };
       }
     }
 
