@@ -15,6 +15,7 @@ import { AdminAnalyticsDashboard } from './components/AdminAnalyticsDashboard';
 import { UserManagementView } from './components/UserManagementView';
 import { DocumentsView } from './components/DocumentsView';
 import { NotesView } from './components/NotesView';
+import { InterviewsView } from './components/InterviewsView';
 import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { CalendarView } from './components/calendar/CalendarView';
@@ -110,13 +111,12 @@ function MainLayout() {
               )}
 
               {activeTab === 'interviews' && (
-                <DashboardView
+                <InterviewsView
                   onOpenInterview={handleOpenInterview}
                   onOpenNewInterview={() => {
                     setNewInterviewDate(undefined);
                     setShowNewModal(true);
                   }}
-                  onNavigate={(tab) => setActiveTab(tab)}
                 />
               )}
 
