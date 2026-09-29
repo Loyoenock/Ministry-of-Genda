@@ -48,7 +48,10 @@ export function mapRowToInterview(row: any): Interview {
     interviewee_name: row.interviewee_name,
     role_title: row.role_title,
     department_unit: row.department_unit,
-    years_in_role: Number(row.years_in_role) || 1.0,
+    years_in_role:
+      row.years_in_role !== null && row.years_in_role !== undefined && !isNaN(Number(row.years_in_role))
+        ? Number(row.years_in_role)
+        : 1.0,
     interview_date: row.interview_date,
     interview_time: row.interview_time || '10:00 AM',
     location: row.location || 'Ministry Headquarters, Kampala',

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.interviews (
     interviewee_name TEXT NOT NULL,
     role_title TEXT NOT NULL,
     department_unit TEXT NOT NULL,
-    years_in_role NUMERIC(4,1) DEFAULT 1.0,
+    years_in_role NUMERIC(5,2) DEFAULT 1.0,
     interview_date DATE NOT NULL DEFAULT CURRENT_DATE,
     interview_time TEXT DEFAULT '10:00 AM',
     location TEXT NOT NULL DEFAULT 'Ministry Headquarters, Kampala',

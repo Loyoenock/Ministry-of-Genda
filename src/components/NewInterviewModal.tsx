@@ -93,7 +93,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
       interviewee_name: intervieweeName.trim(),
       role_title: roleTitle.trim(),
       department_unit: departmentUnit.trim(),
-      years_in_role: parseFloat(yearsInRole) || 1.0,
+      years_in_role: !isNaN(parseFloat(yearsInRole)) ? parseFloat(yearsInRole) : 1.0,
       interview_date: interviewDate,
       interview_time: interviewTime,
       location: location.trim(),
@@ -202,7 +202,7 @@ export const NewInterviewModal: React.FC<NewInterviewModalProps> = ({
                 </label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   min="0.1"
                   value={yearsInRole}
                   onChange={(e) => setYearsInRole(e.target.value)}
