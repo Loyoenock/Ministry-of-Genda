@@ -934,7 +934,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Admin Delete User
+   * Admin Delete User - fully synced to Supabase database
    */
   const adminDeleteUser = async (userId: string) => {
     if (currentUser && currentUser.id === userId) {
@@ -948,17 +948,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && actualRole === 'admin') {
       try {
+        // First delete or clean up any interviews assigned to this interviewer if cascades aren't active yet
+        await supabase.from('interviews').delete().eq('interviewer_id', userId);
+
+        // Delete profile from public.profiles
         const { error } = await supabase.from('profiles').delete().eq('id', userId);
+
         if (error) {
-          console.error('Error deleting user in Supabase:', error.message);
+          console.error('Error deleting user profile in Supabase:', error.message);
           setUsers(prevUsers);
-          triggerError('Failed to delete user in Supabase: ' + error.message);
+          triggerError('Failed to delete user in database: ' + error.message);
           return { error };
         }
       } catch (err: any) {
-        console.error('Error deleting user in Supabase:', err);
+        console.error('Error deleting user profile in Supabase:', err);
         setUsers(prevUsers);
-        triggerError('Failed to delete user');
+        triggerError('Failed to delete user from database');
         return { error: err };
       }
     }
