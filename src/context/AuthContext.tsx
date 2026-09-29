@@ -245,6 +245,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let isMounted = true;
 
+    // Check if current URL is a password recovery link
+    const isRecoveryUrl =
+      typeof window !== 'undefined' &&
+      (window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery'));
+
     // Check active session on mount
     supabase.auth
       .getSession()
@@ -254,10 +259,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Supabase session fetch warning:', error.message);
         }
         setSession(currentSession);
-        if (currentSession?.user) {
+        if (currentSession?.user && !isRecoveryUrl) {
           fetchOrCreateProfile(currentSession.user);
         } else {
-          // When Supabase is configured, lack of active session means unauthenticated user
+          // When in password recovery flow or missing session, do not auto-login user
           setCurrentUser(null);
           setLoading(false);
         }
@@ -276,7 +281,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setSession(newSession);
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (event === 'PASSWORD_RECOVERY' || isRecoveryUrl) {
+          // Explicitly do NOT log user into main app on password recovery link
+          setCurrentUser(null);
+          setLoading(false);
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (newSession?.user) {
             await fetchOrCreateProfile(newSession.user);
           }
@@ -605,6 +614,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthError(error.message);
         return { error: new Error(error.message), code: 'UNKNOWN' };
       }
+
+      // Ensure user is NOT automatically logged in after resetting password;
+      // sign out recovery session and clear URL parameters so they log in manually.
+      if (typeof supabase.auth?.signOut === 'function') {
+        await supabase.auth.signOut().catch(() => {});
+      }
+      if (typeof window !== 'undefined' && window.history?.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      setSession(null);
+      setCurrentUser(null);
 
       setAuthError(null);
       return { error: null };

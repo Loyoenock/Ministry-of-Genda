@@ -115,4 +115,43 @@ describe('User Password Reset Functionality', () => {
     expect(screen.getByTestId('email-error')).toBeInTheDocument();
     expect(supabase.auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
+
+  it('directs recovery link user to password reset view without logging in automatically', async () => {
+    (supabase.auth.updateUser as any).mockResolvedValueOnce({ error: null });
+
+    // Simulate recovery link URL parameters
+    window.location.hash = '#access_token=test-token&type=recovery';
+
+    render(
+      <AuthProvider>
+        <LoginView />
+      </AuthProvider>
+    );
+
+    // Verify user is directed to "Set New Password" page
+    expect(screen.getByText(/Set New Password/i)).toBeInTheDocument();
+    expect(screen.getByTestId('reset-password-submit-btn')).toBeInTheDocument();
+
+    // Enter new password
+    fireEvent.change(screen.getByTestId('login-password'), {
+      target: { value: 'NewSecurePassword123' },
+    });
+
+    // Submit new password
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('reset-password-submit-btn'));
+    });
+
+    // Verify updateUser was called
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({
+      password: 'NewSecurePassword123',
+    });
+
+    // Verify success banner appears and view returns to sign in tab
+    expect(screen.getByTestId('login-success-alert')).toBeInTheDocument();
+    expect(screen.getByText(/Password updated successfully/i)).toBeInTheDocument();
+
+    // Clean up hash
+    window.location.hash = '';
+  });
 });
