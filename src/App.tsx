@@ -19,6 +19,7 @@ import { InterviewsView } from './components/InterviewsView';
 import { ProfileView } from './components/ProfileView';
 import { SupportView } from './components/SupportView';
 import { CalendarView } from './components/calendar/CalendarView';
+import { QuestionsManagerView } from './components/QuestionsManagerView';
 import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
 import { SupabaseConfigErrorView } from './components/SupabaseConfigErrorView';
@@ -118,6 +119,10 @@ function MainLayout() {
                     setShowNewModal(true);
                   }}
                 />
+              )}
+
+              {activeTab === 'questions' && (
+                <QuestionsManagerView />
               )}
 
               {activeTab === 'calendar' && (

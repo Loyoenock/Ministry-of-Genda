@@ -7,6 +7,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Question, InterviewTier } from '../types';
 import {
   fetchQuestionsFromSupabase,
+  insertQuestionInSupabase,
+  updateQuestionInSupabase,
+  deleteQuestionInSupabase,
   getQuestionsForTier as filterQuestionsForTier,
   getSectionsForTier as filterSectionsForTier,
   getCachedOrFallbackQuestions,
@@ -16,7 +19,7 @@ import {
   QuestionsCacheMetadata,
   SectionConfig,
 } from '../lib/questionsService';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 /**
  * Hook providing reactive access to the master questions catalogue.
@@ -84,6 +87,69 @@ export function useQuestions() {
     }
   }, [loadQuestions]);
 
+  // Realtime subscription to public.questions table changes
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel('questions-realtime-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'questions',
+        },
+        () => {
+          loadQuestions(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadQuestions]);
+
+  const addQuestion = useCallback(
+    async (q: Question) => {
+      setLoading(true);
+      const res = await insertQuestionInSupabase(q);
+      if (!res.error) {
+        await loadQuestions(true);
+      }
+      setLoading(false);
+      return res;
+    },
+    [loadQuestions]
+  );
+
+  const editQuestion = useCallback(
+    async (id: string, updates: Partial<Question>) => {
+      setLoading(true);
+      const res = await updateQuestionInSupabase(id, updates);
+      if (!res.error) {
+        await loadQuestions(true);
+      }
+      setLoading(false);
+      return res;
+    },
+    [loadQuestions]
+  );
+
+  const removeQuestion = useCallback(
+    async (id: string) => {
+      setLoading(true);
+      const res = await deleteQuestionInSupabase(id);
+      if (!res.error) {
+        await loadQuestions(true);
+      }
+      setLoading(false);
+      return res;
+    },
+    [loadQuestions]
+  );
+
   const getQuestionsForTier = useCallback(
     (tier: InterviewTier): Question[] => {
       return filterQuestionsForTier(tier, questions);
@@ -104,6 +170,9 @@ export function useQuestions() {
     error,
     cacheMeta,
     refreshQuestions: loadQuestions,
+    addQuestion,
+    editQuestion,
+    removeQuestion,
     getQuestionsForTier,
     getSectionsForTier,
   };

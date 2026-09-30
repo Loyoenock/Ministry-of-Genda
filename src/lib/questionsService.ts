@@ -332,3 +332,139 @@ export function getSectionsForTier(
 
   return Array.from(sectionMap.values());
 }
+
+/**
+ * Maps frontend Question object to raw database row for public.questions.
+ */
+export function mapQuestionToRow(q: Question): any {
+  return {
+    id: q.id,
+    section_code: q.section_code,
+    section_title: q.section_title,
+    question_text: q.question_text,
+    who_to_ask: q.who_to_ask,
+    prompt_hints: q.prompt_hints || null,
+    applicable_tiers: q.applicable_tiers,
+    response_type: q.response_type,
+    sort_order: Number(q.sort_order) || 0,
+    statutory_reference: q.statutory_reference || null,
+  };
+}
+
+/**
+ * Inserts a new diagnostic question into Supabase public.questions table.
+ */
+export async function insertQuestionInSupabase(
+  q: Question
+): Promise<{ data: Question | null; error: any }> {
+  if (!isSupabaseConfigured) {
+    const current = getCachedOrFallbackQuestions();
+    const newList = [...current, q];
+    updateQuestionsCache(newList, 'fallback');
+    return { data: q, error: null };
+  }
+
+  try {
+    const row = mapQuestionToRow(q);
+    const { data, error } = await supabase
+      .from('questions')
+      .insert(row)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('[DATABASE ERROR] Failed to insert question into Supabase:', error.message);
+      return { data: null, error };
+    }
+
+    const created = data ? mapRowToQuestion(data) : q;
+    const current = getCachedOrFallbackQuestions();
+    const exists = current.some((item) => item.id === created.id);
+    const newList = exists
+      ? current.map((item) => (item.id === created.id ? created : item))
+      : [...current, created];
+    updateQuestionsCache(newList, 'supabase');
+    return { data: created, error: null };
+  } catch (err: any) {
+    console.error('Exception inserting question into Supabase:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Updates an existing diagnostic question in Supabase public.questions table.
+ */
+export async function updateQuestionInSupabase(
+  id: string,
+  updates: Partial<Question>
+): Promise<{ data: Question | null; error: any }> {
+  if (!isSupabaseConfigured) {
+    const current = getCachedOrFallbackQuestions();
+    const newList = current.map((item) => (item.id === id ? { ...item, ...updates } : item));
+    updateQuestionsCache(newList, 'fallback');
+    const updated = newList.find((item) => item.id === id) || null;
+    return { data: updated, error: null };
+  }
+
+  try {
+    const payload: any = {};
+    if (updates.section_code !== undefined) payload.section_code = updates.section_code;
+    if (updates.section_title !== undefined) payload.section_title = updates.section_title;
+    if (updates.question_text !== undefined) payload.question_text = updates.question_text;
+    if (updates.who_to_ask !== undefined) payload.who_to_ask = updates.who_to_ask;
+    if (updates.prompt_hints !== undefined) payload.prompt_hints = updates.prompt_hints || null;
+    if (updates.applicable_tiers !== undefined) payload.applicable_tiers = updates.applicable_tiers;
+    if (updates.response_type !== undefined) payload.response_type = updates.response_type;
+    if (updates.sort_order !== undefined) payload.sort_order = Number(updates.sort_order);
+    if (updates.statutory_reference !== undefined) payload.statutory_reference = updates.statutory_reference || null;
+
+    const { data, error } = await supabase
+      .from('questions')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('[DATABASE ERROR] Failed to update question in Supabase:', error.message);
+      return { data: null, error };
+    }
+
+    const updated = data ? mapRowToQuestion(data) : null;
+    const current = getCachedOrFallbackQuestions();
+    const newList = current.map((item) => (item.id === id ? { ...item, ...updates } : item));
+    updateQuestionsCache(newList, 'supabase');
+    return { data: updated, error: null };
+  } catch (err: any) {
+    console.error('Exception updating question in Supabase:', err);
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Deletes a diagnostic question from Supabase public.questions table (Admins only).
+ */
+export async function deleteQuestionInSupabase(id: string): Promise<{ error: any }> {
+  if (!isSupabaseConfigured) {
+    const current = getCachedOrFallbackQuestions();
+    const newList = current.filter((q) => q.id !== id);
+    updateQuestionsCache(newList, 'fallback');
+    return { error: null };
+  }
+
+  try {
+    const { error } = await supabase.from('questions').delete().eq('id', id);
+    if (error) {
+      console.error('[DATABASE ERROR] Failed to delete question from Supabase:', error.message);
+      return { error };
+    }
+
+    const current = getCachedOrFallbackQuestions();
+    const newList = current.filter((q) => q.id !== id);
+    updateQuestionsCache(newList, 'supabase');
+    return { error: null };
+  } catch (err: any) {
+    console.error('Exception deleting question from Supabase:', err);
+    return { error: err };
+  }
+}
