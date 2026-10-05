@@ -127,6 +127,10 @@ export function getCachedOrFallbackQuestions(): Question[] {
     return [];
   }
 
+  if (isSupabaseConfigured) {
+    console.warn('[OPERATOR WARNING] Unseeded or unavailable database detected: falling back to static MASTER_QUESTIONS catalogue.');
+  }
+
   inMemoryCacheSource = 'fallback';
   return MASTER_QUESTIONS;
 }
