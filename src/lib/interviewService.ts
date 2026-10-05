@@ -39,10 +39,30 @@ export const generateUuid = (): string => {
   });
 };
 
+export type InterviewRowInput = Record<string, unknown> & {
+  id: string;
+  interviewee_name: string;
+  role_title: string;
+  department_unit: string;
+  years_in_role?: number | string | null;
+  interview_date?: string | null;
+  interview_time?: string | null;
+  location?: string | null;
+  interviewer_id: string;
+  interviewer_name?: string | null;
+  profiles?: { full_name?: string | null } | null;
+  tier: string;
+  status: string;
+  duration_min?: number | string | null;
+  completion_percentage?: number | string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 /**
  * Maps raw database row from public.interviews to frontend Interview model
  */
-export function mapRowToInterview(row: any): Interview {
+export function mapRowToInterview(row: InterviewRowInput): Interview {
   return {
     id: row.id,
     interviewee_name: row.interviewee_name,
@@ -52,7 +72,7 @@ export function mapRowToInterview(row: any): Interview {
       row.years_in_role !== null && row.years_in_role !== undefined && !isNaN(Number(row.years_in_role))
         ? Number(row.years_in_role)
         : 1.0,
-    interview_date: row.interview_date,
+    interview_date: row.interview_date || '',
     interview_time: row.interview_time || '10:00 AM',
     location: row.location || 'Ministry Headquarters, Kampala',
     interviewer_id: row.interviewer_id,
@@ -61,15 +81,28 @@ export function mapRowToInterview(row: any): Interview {
     status: row.status as InterviewStatus,
     duration_min: Number(row.duration_min) || 60,
     completion_percentage: Number(row.completion_percentage) || 0,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    created_at: row.created_at || '',
+    updated_at: row.updated_at || '',
   };
 }
+
+export type DocumentItemRowInput = Record<string, unknown> & {
+  id: string;
+  interview_id: string;
+  item_number: number;
+  document_title: string;
+  category: string;
+  exists_status?: string | null;
+  collected_status?: string | null;
+  notes?: string | null;
+  follow_up_action?: string | null;
+  file_url?: string | null;
+};
 
 /**
  * Maps raw database row from public.documents_checklist to DocumentItem
  */
-export function mapRowToDocumentItem(row: any): DocumentItem {
+export function mapRowToDocumentItem(row: DocumentItemRowInput): DocumentItem {
   let fileName: string | undefined = undefined;
   if (row.file_url) {
     const cleanUrl = row.file_url.split('?')[0];
@@ -95,15 +128,27 @@ export function mapRowToDocumentItem(row: any): DocumentItem {
   };
 }
 
+export type InterviewerNoteRowInput = Record<string, unknown> & {
+  id: string;
+  interview_id: string;
+  observations?: string | null;
+  numbers_captured?: Record<string, any> | null;
+  contradictions?: string | null;
+  documents_collected_summary?: string | null;
+  follow_ups?: string | null;
+  maturity_signals?: Record<string, any> | null;
+  updated_at?: string | null;
+};
+
 /**
  * Maps raw database row from public.interviewer_notes to InterviewerNote
  */
-export function mapRowToInterviewerNote(row: any): InterviewerNote {
+export function mapRowToInterviewerNote(row: InterviewerNoteRowInput): InterviewerNote {
   return {
     id: row.id,
     interview_id: row.interview_id,
     observations: row.observations || '',
-    numbers_captured: row.numbers_captured || {
+    numbers_captured: (row.numbers_captured as any) || {
       total_staff: null,
       labour_officers_count: null,
       annual_inspections: null,
@@ -116,7 +161,7 @@ export function mapRowToInterviewerNote(row: any): InterviewerNote {
     contradictions: row.contradictions || '',
     documents_collected_summary: row.documents_collected_summary || '',
     follow_ups: row.follow_ups || '',
-    maturity_signals: row.maturity_signals || {
+    maturity_signals: (row.maturity_signals as any) || {
       governance_score: 3,
       technology_score: 2,
       process_score: 2,
@@ -128,10 +173,20 @@ export function mapRowToInterviewerNote(row: any): InterviewerNote {
   };
 }
 
+export type AnswerRowInput = Record<string, unknown> & {
+  id: string;
+  interview_id: string;
+  question_id: string;
+  answer_text?: string | null;
+  structured_data?: Record<string, any> | null;
+  is_flagged?: boolean | null;
+  updated_at?: string | null;
+};
+
 /**
  * Maps raw database row from public.answers to Answer
  */
-export function mapRowToAnswer(row: any): Answer {
+export function mapRowToAnswer(row: AnswerRowInput): Answer {
   return {
     id: row.id,
     interview_id: row.interview_id,
