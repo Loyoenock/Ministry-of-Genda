@@ -46,7 +46,26 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. If service role key is provided, perform automated seed insert
+  // 1. Check live public.questions table status before writing any rows
+  const checkClient = createClient(url, serviceRoleKey || anonKey);
+  const { data: existingQuestions, error: fetchError } = await checkClient
+    .from('questions')
+    .select('id, sort_order');
+
+  if (!fetchError && existingQuestions && existingQuestions.length === MASTER_QUESTIONS.length) {
+    const masterMap = new Map(MASTER_QUESTIONS.map((q) => [q.id, q.sort_order]));
+    const isAlreadySeeded =
+      existingQuestions.length === MASTER_QUESTIONS.length &&
+      existingQuestions.every((q) => masterMap.has(q.id) && masterMap.get(q.id) === q.sort_order);
+
+    if (isAlreadySeeded) {
+      console.log(`✅ Database is already seeded with all ${MASTER_QUESTIONS.length} diagnostic questions – no changes needed.`);
+      console.log('✅ Master catalogue verified intact.');
+      return;
+    }
+  }
+
+  // 2. If service role key is provided, perform automated seed insert
   if (serviceRoleKey) {
     console.log('🔑 Supabase Service Role Key detected. Executing direct seed insertion...');
     const adminClient = createClient(url, serviceRoleKey, {

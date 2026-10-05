@@ -577,8 +577,35 @@ To guarantee that email domain restrictions cannot be bypassed by clients callin
 ### Root Cause
 Users can successfully create accounts (`supabase.auth.signUp`), but subsequent sign-in attempts fail with `EMAIL_NOT_CONFIRMED` (HTTP 400). This occurs because Supabase Auth has **Email Confirmation** enabled by default, creating user rows where `email_confirmed_at IS NULL` and returning no session upon sign-up.
 
+### Quick Operator Triage Checklist
+When an MGLSD staff member reports "signup succeeded but login fails", follow this step-by-step checklist:
+
+1. **Step 1: Verify Account Existence & Confirmation Status**
+   In the Supabase SQL Editor, run:
+   ```sql
+   SELECT id, email, email_confirmed_at, created_at
+   FROM auth.users
+   WHERE email = 'officer@mglsd.go.ug';
+   ```
+2. **Step 2: Confirm Email Address (If Unconfirmed)**
+   If `email_confirmed_at` is `NULL`, execute:
+   ```sql
+   UPDATE auth.users
+   SET email_confirmed_at = NOW()
+   WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
+   ```
+3. **Step 3: Verify Profile Row & Role Assignment**
+   Confirm that the profile row exists in `public.profiles`:
+   ```sql
+   SELECT id, email, role, full_name, department_unit
+   FROM public.profiles
+   WHERE email = 'officer@mglsd.go.ug';
+   ```
+4. **Step 4: Prompt User to Sign In**
+   Instruct the user to re-attempt sign-in on the login page using their registered credentials.
+
 ### Diagnostic SQL
-Operators can check user confirmation status directly in the Supabase SQL Editor:
+Operators can also inspect recent user confirmation statuses in bulk via the Supabase SQL Editor:
 ```sql
 select id, email, email_confirmed_at, created_at
 from auth.users
