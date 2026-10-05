@@ -23,6 +23,7 @@ import { QuestionsManagerView } from './components/QuestionsManagerView';
 import { DiagnosticExportModal } from './components/DiagnosticExportModal';
 import { LoginView } from './components/LoginView';
 import { SupabaseConfigErrorView } from './components/SupabaseConfigErrorView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Interview } from './types';
 import { fetchQuestionsFromSupabase } from './lib/questionsService';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -220,7 +221,11 @@ function RootContent() {
     return <LoginView />;
   }
 
-  return <MainLayout />;
+  return (
+    <ErrorBoundary>
+      <MainLayout />
+    </ErrorBoundary>
+  );
 }
 
 export default function App() {
