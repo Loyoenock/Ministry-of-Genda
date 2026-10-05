@@ -22,16 +22,26 @@ const rawKey = (
 // Security assertion: Ensure service_role key is never exposed to the client
 if (rawKey.includes('service_role') || (rawKey.length > 200 && rawKey.includes('eyJ'))) {
   // Check if it's likely a service role key by inspecting base64 payload if possible or keyword
-  try {
-    const parts = rawKey.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (payload.role === 'service_role') {
-        console.error('[SECURITY CRITICAL] You have provided a Supabase SERVICE_ROLE key instead of an ANON key! Service role keys bypass RLS and must NEVER be exposed to the browser via VITE_SUPABASE_ANON_KEY.');
+  let isServiceRole = rawKey.includes('service_role');
+  if (!isServiceRole) {
+    try {
+      const parts = rawKey.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.role === 'service_role') {
+          isServiceRole = true;
+        }
       }
+    } catch (e) {
+      // ignore parse error
     }
-  } catch (e) {
-    // ignore parse error
+  }
+
+  if (isServiceRole) {
+    const errorMsg =
+      '[SECURITY CRITICAL] You have provided a Supabase SERVICE_ROLE key instead of an ANON key! Service role keys bypass RLS and must NEVER be exposed to the browser via VITE_SUPABASE_ANON_KEY.';
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 }
 
