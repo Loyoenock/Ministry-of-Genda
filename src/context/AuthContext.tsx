@@ -724,34 +724,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
-   * Role Switcher for previewing RLS perspectives:
-   * - When Supabase is configured: non-admin users can NEVER call switchRole('admin') or escalate their role
-   * - Only authenticated Admins who signed in through Supabase can toggle between 'admin' and 'interviewer' preview
-   * - In production builds with Supabase: role switching is completely disabled
-   * - In test environments: test personas can be toggled for RLS assertions
+   * Role Switcher:
+   * - When Supabase is configured (isSupabaseConfigured === true): no-op that returns immediately.
+   * - Demo mode (isSupabaseConfigured === false): allows role switching.
    */
   const switchRole = (newRole: UserRole) => {
-    // 1. When Supabase is configured (non-test env):
-    if (isSupabaseConfigured && !isTestEnv) {
-      // In production builds, completely disable role switching
-      if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
-        console.warn('Security Notice: Role switching is disabled in production with Supabase configured.');
-        return;
-      }
-      // Strictly prevent non-admins from switching to admin
-      if (actualRole !== 'admin') {
-        console.warn('Security Violation: Non-admin users cannot switch to admin role when Supabase is configured.');
-        return;
-      }
-      // Legitimate Supabase admins can preview the interviewer perspective
-      setActiveRole(newRole);
-      if (currentUser) {
-        setCurrentUser({ ...currentUser, role: newRole });
-      }
+    if (isSupabaseConfigured) {
       return;
     }
 
-    // 2. Test environment:
     if (newRole === 'admin') {
       const admin = users.find((u) => u.role === 'admin') || ADMIN_USER;
       setCurrentUser(admin);
