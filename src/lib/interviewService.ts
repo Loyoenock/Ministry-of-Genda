@@ -728,6 +728,7 @@ export async function uploadFileToSupabaseStorage(
   const storagePath = `${interviewId}/${itemNumber}_${timestamp}_${sanitizedName}`;
 
   if (!isSupabaseConfigured) {
+    console.info('Demo mode stores metadata only; binary upload requires live Supabase');
     return {
       storagePath,
       url: `#demo-${file.name}`,
