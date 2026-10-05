@@ -7,6 +7,7 @@ import React from 'react';
 import {
   X,
   Printer,
+  Download,
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useInterviewReport } from '../hooks/useInterviewReport';
 import { getQuestionsForTier } from '../lib/questionsService';
+import { generateDiagnosticBriefPdf } from '../lib/reportService';
 
 interface DiagnosticExportModalProps {
   interviewId: string;
@@ -72,6 +74,18 @@ export const DiagnosticExportModal: React.FC<DiagnosticExportModalProps> = ({
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print Diagnostic Brief</span>
               <span className="sm:hidden">Print</span>
+            </button>
+
+            <button
+              onClick={() => reportData && generateDiagnosticBriefPdf(reportData)}
+              disabled={loading || !reportData}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[38px] cursor-pointer border border-slate-700 shadow-xs"
+              title="Download standalone diagnostic brief dossier"
+              data-testid="download-pdf-btn"
+            >
+              <Download className="w-4 h-4 text-teal-400" />
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
             </button>
 
             <button

@@ -587,3 +587,153 @@ export async function fetchAnalyticsDataset(
     lastRefreshedAt: new Date().toISOString(),
   };
 }
+
+/**
+ * Generates and triggers download of a complete diagnostic brief dossier document.
+ */
+export function generateDiagnosticBriefPdf(data: DiagnosticBriefData): void {
+  const { interview, answers, checklist, notes, interviewerProfile, fetchedAt } = data;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Diagnostic Brief - ${interview.interviewee_name || interview.id}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { font-family: 'Times New Roman', Georgia, serif; color: #0f172a; margin: 0; padding: 24px; line-height: 1.5; font-size: 12px; }
+    .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+    .coat-of-arms { width: 70px; height: 70px; object-fit: contain; margin-bottom: 6px; }
+    .sub-title { font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
+    .main-title { font-family: Arial, sans-serif; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #020617; margin: 4px 0; }
+    .programme-title { font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #134e4a; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: Arial, sans-serif; margin-bottom: 16px; }
+    .section-heading { font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #020617; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 16px; margin-bottom: 8px; }
+    .scores-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center; font-family: Arial, sans-serif; margin-bottom: 12px; }
+    .score-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; }
+    .score-val { font-size: 14px; font-weight: bold; color: #134e4a; display: block; margin-top: 2px; }
+    .response-item { border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 6px; }
+    .q-text { font-weight: bold; font-family: Arial, sans-serif; color: #0f172a; margin-bottom: 2px; }
+    .ans-text { font-style: italic; background: #f8fafc; padding: 6px 8px; border-radius: 4px; border: 1px solid #f1f5f9; color: #334155; }
+    .checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-family: Arial, sans-serif; font-size: 11px; margin-bottom: 12px; }
+    .check-item { display: flex; justify-content: space-between; padding: 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .status-badge { font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 9px; }
+    .status-collected { background: #d1fae5; color: #065f46; }
+    .status-pending { background: #e2e8f0; color: #334155; }
+    .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px; padding-top: 16px; border-top: 2px solid #0f172a; font-family: Arial, sans-serif; }
+    .sig-line { border-bottom: 1px solid #94a3b8; width: 180px; margin-top: 32px; margin-bottom: 4px; }
+    .footer { text-align: center; font-family: Arial, sans-serif; font-size: 9px; color: #94a3b8; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="/Coat_of_arms_of_Uganda.svg" class="coat-of-arms" alt="Coat of Arms of Uganda">
+    <div class="sub-title">The Republic of Uganda</div>
+    <div class="main-title">Ministry of Gender, Labour and Social Development</div>
+    <div class="programme-title">Labour Directorate • TRANSFORMATIVE Programme Diagnostic Brief</div>
+    <div style="font-family: Arial, sans-serif; font-size: 10px; color: #64748b; margin-top: 2px;">
+      Official Record of Field Evidence & Institutional Current-State Assessment • Verified Supabase Record
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div>
+      <div><strong>Interviewee:</strong> ${interview.interviewee_name || 'Not provided'}</div>
+      <div><strong>Official Title:</strong> ${interview.role_title || 'Not provided'}</div>
+      <div><strong>Department / Unit:</strong> ${interview.department_unit || 'Labour Directorate'}</div>
+      <div><strong>Duty Location:</strong> ${interview.location || 'Headquarters, Kampala'}</div>
+    </div>
+    <div>
+      <div><strong>Interview Tier:</strong> ${interview.tier}</div>
+      <div><strong>Field Interviewer:</strong> ${interviewerProfile?.full_name || interview.interviewer_name || 'Assigned Officer'}</div>
+      <div><strong>Session Date & Time:</strong> ${interview.interview_date || 'N/A'} at ${interview.interview_time || '10:00 AM'}</div>
+      <div><strong>Dossier Status:</strong> ${interview.status} (${interview.completion_percentage}%)</div>
+    </div>
+  </div>
+
+  <div class="section-heading">1. Institutional Maturity Diagnostic Scores (1 to 5)</div>
+  <div class="scores-grid">
+    <div class="score-card">
+      <span style="color: #64748b; font-size: 10px;">Governance</span>
+      <span class="score-val">${notes.maturity_signals?.governance_score ? `${notes.maturity_signals.governance_score}/5` : 'N/S'}</span>
+    </div>
+    <div class="score-card">
+      <span style="color: #64748b; font-size: 10px;">IT & Systems</span>
+      <span class="score-val">${notes.maturity_signals?.technology_score ? `${notes.maturity_signals.technology_score}/5` : 'N/S'}</span>
+    </div>
+    <div class="score-card">
+      <span style="color: #64748b; font-size: 10px;">Workflows & SOPs</span>
+      <span class="score-val">${notes.maturity_signals?.process_score ? `${notes.maturity_signals.process_score}/5` : 'N/S'}</span>
+    </div>
+    <div class="score-card">
+      <span style="color: #64748b; font-size: 10px;">Staff Capabilities</span>
+      <span class="score-val">${notes.maturity_signals?.people_skills_score ? `${notes.maturity_signals.people_skills_score}/5` : 'N/S'}</span>
+    </div>
+    <div class="score-card">
+      <span style="color: #64748b; font-size: 10px;">Data & Reporting</span>
+      <span class="score-val">${notes.maturity_signals?.data_reporting_score ? `${notes.maturity_signals.data_reporting_score}/5` : 'N/S'}</span>
+    </div>
+  </div>
+
+  <div class="section-heading">2. Key Diagnostic Responses (${answers.length} Responses Logged)</div>
+  <div>
+    ${answers.length === 0 ? '<p style="font-style: italic; color: #64748b;">No questionnaire responses recorded in database.</p>' : answers.map(a => `
+      <div class="response-item">
+        <div class="q-text">[${a.question_id}] Response</div>
+        <div class="ans-text">"${a.answer_text}"</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="section-heading">3. Statutory Supporting Evidence Status</div>
+  <div class="checklist-grid">
+    ${checklist.slice(0, 14).map(d => `
+      <div class="check-item">
+        <span>${d.item_number}. ${d.document_title}</span>
+        <span class="status-badge ${d.collected_status === 'Collected' ? 'status-collected' : 'status-pending'}">${d.collected_status}</span>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="section-heading">4. Field Observations & Quantitative Baselines</div>
+  <div style="font-family: Arial, sans-serif; font-size: 11px; margin-bottom: 8px;">
+    <strong>Annual Inspections:</strong> ${notes.numbers_captured?.annual_inspections ?? 'N/A'} | 
+    <strong>Disputes Logged:</strong> ${notes.numbers_captured?.disputes_logged ?? 'N/A'} | 
+    <strong>Disputes Resolved:</strong> ${notes.numbers_captured?.disputes_resolved ?? 'N/A'} | 
+    <strong>Unit Staff Count:</strong> ${notes.numbers_captured?.total_staff ?? 'N/A'}
+  </div>
+  ${notes.observations ? `<div style="margin-bottom: 6px;"><strong>Interviewer Qualitative Observations:</strong><br><span style="font-style: italic;">${notes.observations}</span></div>` : ''}
+  ${notes.contradictions ? `<div><strong>Operational Friction / Contradictions:</strong><br><span style="font-style: italic;">${notes.contradictions}</span></div>` : ''}
+
+  <div class="signature-grid">
+    <div>
+      <div><strong>Field Diagnostic Interviewer:</strong></div>
+      <div class="sig-line"></div>
+      <div><strong>${interviewerProfile?.full_name || interview.interviewer_name || 'Assigned Officer'}</strong></div>
+      <div style="font-size: 10px; color: #64748b;">${interviewerProfile?.department_unit || 'MGLSD Labour Directorate'}</div>
+    </div>
+    <div>
+      <div><strong>Interviewee Verification:</strong></div>
+      <div class="sig-line"></div>
+      <div><strong>${interview.interviewee_name || 'Interviewee'}</strong></div>
+      <div style="font-size: 10px; color: #64748b;">${interview.role_title || 'Officer'}</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    TRANSFORMATIVE Diagnostic Suite • System Timestamp: ${fetchedAt} • CONFIDENTIAL • FOR OFFICIAL GOVERNMENT USE ONLY
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const fileName = `Diagnostic_Brief_${(interview.interviewee_name || interview.id).replace(/[^a-zA-Z0-9_-]/g, '_')}.html`;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
