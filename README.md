@@ -575,13 +575,13 @@ To guarantee that email domain restrictions cannot be bypassed by clients callin
 ## 9.5 Operator Guide: Signup Succeeds But Login Fails (Email Confirmation)
 
 ### Root Cause
-Users can successfully create accounts (`supabase.auth.signUp`), but subsequent sign-in attempts fail with `EMAIL_NOT_CONFIRMED` (HTTP 400). This occurs because Supabase Auth has **Email Confirmation** enabled by default, creating user rows where `email_confirmed_at IS NULL` and returning no session upon sign-up.
+Users can successfully create accounts (`supabase.auth.signUp`), but subsequent sign-in attempts fail with `EMAIL_NOT_CONFIRMED` (HTTP 400) or invalid credentials. This occurs because Supabase Auth has **Email Confirmation** enabled by default, creating user rows where `email_confirmed_at IS NULL` and returning no session upon sign-up.
 
 ### Quick Operator Triage Checklist
 When an MGLSD staff member reports "signup succeeded but login fails", follow this step-by-step checklist:
 
 1. **Step 1: Verify Account Existence & Confirmation Status**
-   In the Supabase SQL Editor, run:
+   In the Supabase SQL Editor, check if the account exists in `auth.users` and check its `email_confirmed_at` timestamp:
    ```sql
    SELECT id, email, email_confirmed_at, created_at
    FROM auth.users
@@ -595,14 +595,38 @@ When an MGLSD staff member reports "signup succeeded but login fails", follow th
    WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
    ```
 3. **Step 3: Verify Profile Row & Role Assignment**
-   Confirm that the profile row exists in `public.profiles`:
+   Confirm that the profile row exists in `public.profiles` and has a valid role (`interviewer` or `admin`):
    ```sql
    SELECT id, email, role, full_name, department_unit
    FROM public.profiles
    WHERE email = 'officer@mglsd.go.ug';
    ```
-4. **Step 4: Prompt User to Sign In**
-   Instruct the user to re-attempt sign-in on the login page using their registered credentials.
+   *If missing, ensure the automatic `on_auth_user_created` profile trigger executed or manually insert the profile row.*
+4. **Step 4: Validate Domain Allow-List Rules**
+   Ensure the user's email domain matches authorized Ministry suffixes (`@mglsd.go.ug`, `*.go.ug`, `@malaikapath.org`, `@gmail.com`, `@yahoo.com`).
+5. **Step 5: Direct User to Sign In**
+   Instruct the user to return to the Login View and enter their registered credentials.
+
+### Copy-Paste All-in-One Diagnostic & Fix SQL
+Administrators can run this single block in the Supabase SQL Editor (replace `officer@mglsd.go.ug` with the user's email):
+```sql
+-- 1. Confirm user email address
+UPDATE auth.users
+SET email_confirmed_at = COALESCE(email_confirmed_at, NOW())
+WHERE email = 'officer@mglsd.go.ug';
+
+-- 2. Inspect resulting account and profile record
+SELECT 
+  u.id, 
+  u.email, 
+  u.email_confirmed_at, 
+  p.role, 
+  p.full_name, 
+  p.department_unit
+FROM auth.users u
+LEFT JOIN public.profiles p ON u.id = p.id
+WHERE u.email = 'officer@mglsd.go.ug';
+```
 
 ### Diagnostic SQL
 Operators can also inspect recent user confirmation statuses in bulk via the Supabase SQL Editor:

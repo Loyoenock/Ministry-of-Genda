@@ -118,6 +118,27 @@ export function setSupabaseConfiguredForTesting(val: boolean): void {
 }
 
 /**
+ * Creates an isolated client without persisting sessions to avoid overwriting active user credentials.
+ * Used for admin staff provisioning so new accounts exist in auth.users before profiles are created.
+ */
+export function createIsolatedAuthClient(): SupabaseClient | null {
+  if (!rawUrl || !rawKey || isUrlPlaceholder || isKeyPlaceholder || !hasValidProtocol) {
+    return null;
+  }
+  try {
+    return createClient(rawUrl, rawKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Full Database schema types matching supabase/migrations/20250916_initial_schema.sql
  */
 export interface Database {

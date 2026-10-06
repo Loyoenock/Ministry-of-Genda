@@ -337,6 +337,7 @@ export const LoginView: React.FC = () => {
           setErrorCode(code || null);
           if (code === 'EMAIL_NOT_CONFIRMED') {
             setIsConfirmationRequired(true);
+            setErrorMessage('Please confirm your email before signing in. Check your inbox for the confirmation link. If you just registered and cannot log in, your email may still need confirmation. Contact your system administrator or use the Support page.');
           } else {
             setIsConfirmationRequired(false);
           }
@@ -361,7 +362,7 @@ export const LoginView: React.FC = () => {
         } else {
           setIsConfirmationRequired(true);
           setSuccessMessage(
-            'Account created successfully. Please check your inbox to confirm your account before logging in.'
+            'Account created successfully. Please check your inbox to confirm your email before signing in. Please confirm your account before logging in. If you just registered and cannot log in, your email may still need confirmation. Contact your system administrator or use the Support page.'
           );
         }
       }
@@ -435,6 +436,18 @@ export const LoginView: React.FC = () => {
 
           {/* Authentication Form Card */}
           <div className="bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200/80 p-6 sm:p-8 space-y-6">
+            {/* Permanent Email Confirmation Guidance Notice */}
+            <div
+              id="login-permanent-confirmation-notice"
+              data-testid="login-permanent-confirmation-notice"
+              className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600 flex items-start space-x-2.5"
+            >
+              <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                If you just registered and cannot log in, your email may still need confirmation. Contact your system administrator or use the Support page.
+              </p>
+            </div>
+
             {/* Mode Switcher Header / Tabs */}
             {mode === 'forgot' ? (
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -529,7 +542,7 @@ export const LoginView: React.FC = () => {
                       Check your email to sign in
                     </h3>
                     <p className="text-xs leading-relaxed text-amber-900">
-                      An account has been created for <strong className="font-semibold">{email || 'your email'}</strong>. Supabase requires email verification before signing in. Please check your inbox and click the confirmation link.
+                      An account has been created for <strong className="font-semibold">{email || 'your email'}</strong>. Supabase requires email verification before signing in. If you just registered and cannot log in, your email may still need confirmation. Contact your system administrator or use the Support page.
                     </p>
                     <div className="pt-1 flex flex-wrap gap-2">
                       <button

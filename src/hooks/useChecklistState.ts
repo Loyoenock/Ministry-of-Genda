@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { DocumentItem, RecentActivityItem } from '../types';
 import { createInitialChecklist } from '../lib/mockData';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -13,6 +13,11 @@ import {
   updateChecklistItemInSupabase,
   uploadFileToSupabaseStorage,
 } from '../lib/interviewService';
+import {
+  savePendingOfflineDocument,
+  getPendingOfflineDocumentsCount,
+  syncPendingOfflineDocuments,
+} from '../lib/offlineDocumentStorage';
 import { AutoSaveStatusType } from './useAutoSaveStatus';
 
 interface UseChecklistStateOptions {
@@ -28,6 +33,38 @@ export function useChecklistState({
 }: UseChecklistStateOptions) {
   // Pure Supabase-driven in-memory cache for active interview checklists
   const [checklistsMap, setChecklistsMap] = useState<Record<string, DocumentItem[]>>({});
+  const [pendingDocsCount, setPendingDocsCount] = useState<number>(0);
+
+  // Auto-sync pending offline documents when connection / Supabase is active
+  useEffect(() => {
+    let isMounted = true;
+
+    const triggerSync = async () => {
+      if (isSupabaseConfigured && (typeof navigator === 'undefined' || navigator.onLine)) {
+        const { syncedCount } = await syncPendingOfflineDocuments(userId || undefined, (count) => {
+          if (isMounted) setPendingDocsCount(count);
+        });
+        if (syncedCount > 0) {
+          setAutoSaveStatus('saved');
+        }
+      } else {
+        const count = await getPendingOfflineDocumentsCount();
+        if (isMounted) setPendingDocsCount(count);
+      }
+    };
+
+    triggerSync();
+
+    const handleOnline = () => {
+      triggerSync();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [userId, setAutoSaveStatus]);
 
   const getInterviewChecklist = useCallback(
     (interviewId: string): DocumentItem[] => {
@@ -158,6 +195,13 @@ export function useChecklistState({
           throw uploadErr;
         }
       } else {
+        if (fileOrName instanceof File) {
+          savePendingOfflineDocument(interviewId, itemNumber, fileOrName)
+            .then(() => getPendingOfflineDocumentsCount().then(setPendingDocsCount))
+            .catch((err) => console.warn('Notice: Offline document storage:', err));
+        } else {
+          console.info('Demo mode stores metadata only; binary upload requires live Supabase');
+        }
         setAutoSaveStatus('saved');
       }
 
@@ -179,6 +223,7 @@ export function useChecklistState({
 
   return {
     checklistsMap,
+    pendingDocsCount,
     getInterviewChecklist,
     initChecklistForInterview,
     removeChecklistForInterview,

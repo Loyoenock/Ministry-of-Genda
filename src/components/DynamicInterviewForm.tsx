@@ -77,6 +77,7 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
     flushAnswersSave,
     flushNotesSave,
     autoSaveStatus,
+    pendingDocsCount = 0,
     questionsLoading,
     questionsError,
     refreshQuestions,
@@ -462,6 +463,18 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
 
           {/* Right Action Tools: Auto-save status, Delete action, Export dossier */}
           <div className="flex flex-wrap items-center justify-end gap-2.5 sm:gap-3">
+            {/* Pending Documents Sync Status Indicator */}
+            {pendingDocsCount > 0 && (
+              <div
+                id="pending-docs-sync-indicator"
+                data-testid="pending-docs-sync-indicator"
+                className="flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-semibold shadow-2xs"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <span>{pendingDocsCount} {pendingDocsCount === 1 ? 'document' : 'documents'} pending sync</span>
+              </div>
+            )}
+
             {/* Auto-save Status Indicator */}
             <div className="flex items-center space-x-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
               {autoSaveStatus === 'saving' && (

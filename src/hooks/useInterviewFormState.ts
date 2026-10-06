@@ -25,6 +25,7 @@ export function useInterviewFormState(interviewId: string) {
     deleteInterview,
     completeInterview: contextCompleteInterview,
     autoSaveStatus: contextAutoSaveStatus,
+    pendingDocsCount = 0,
     setAutoSaveStatus,
   } = useInterviews();
 
@@ -300,6 +301,7 @@ export function useInterviewFormState(interviewId: string) {
     deleteInterview,
     completeInterview: contextCompleteInterview,
     autoSaveStatus: effectiveAutoSaveStatus,
+    pendingDocsCount,
     questionsLoading,
     questionsError,
     refreshQuestions,

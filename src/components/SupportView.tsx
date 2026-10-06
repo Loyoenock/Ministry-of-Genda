@@ -168,6 +168,63 @@ export const SupportView: React.FC = () => {
         )}
       </div>
 
+      {/* Email Confirmation Operator Checklist */}
+      <div
+        id="support-email-confirmation-checklist"
+        data-testid="support-email-confirmation-checklist"
+        className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+            <Mail className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Email Confirmation Operator Checklist</h3>
+            <p className="text-xs text-slate-500">
+              Administrator triage steps for accounts reporting "signup succeeded but login fails"
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-xs text-slate-700">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="font-bold text-slate-800 flex items-center space-x-1.5">
+              <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center">1</span>
+              <span>Step 1: Check Account & Email Confirmation Status (SQL)</span>
+            </div>
+            <p className="text-[11px] text-slate-600">Check if <code>email_confirmed_at</code> is <code>NULL</code> in the Supabase SQL Editor:</p>
+            <pre className="p-2.5 bg-slate-900 text-amber-300 rounded-lg text-[11px] font-mono overflow-x-auto select-all">
+{`SELECT id, email, email_confirmed_at, created_at
+FROM auth.users
+WHERE email = 'officer@mglsd.go.ug';`}
+            </pre>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="font-bold text-slate-800 flex items-center space-x-1.5">
+              <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center">2</span>
+              <span>Step 2: Confirm Email Address via SQL</span>
+            </div>
+            <p className="text-[11px] text-slate-600">If unconfirmed, execute this query to manually confirm the account:</p>
+            <pre className="p-2.5 bg-slate-900 text-amber-300 rounded-lg text-[11px] font-mono overflow-x-auto select-all">
+{`UPDATE auth.users
+SET email_confirmed_at = NOW()
+WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;`}
+            </pre>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="font-bold text-slate-800 flex items-center space-x-1.5">
+              <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center">3</span>
+              <span>Step 3: Confirm via Supabase Dashboard Path</span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Navigate to <strong>Authentication</strong> &rarr; <strong>Users</strong> in the Supabase Dashboard, click the <strong>...</strong> menu next to the user, and select <strong>Confirm email</strong>. (To disable confirmation for closed internal deployments, uncheck <strong>Confirm email</strong> under <strong>Authentication</strong> &rarr; <strong>Providers</strong> &rarr; <strong>Email</strong>).
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3">
           <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">

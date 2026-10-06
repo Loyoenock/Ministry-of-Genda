@@ -33,6 +33,7 @@ export interface InterviewContextType {
   recentActivities: RecentActivityItem[];
   answers: Record<string, Answer[]>;
   checklists: Record<string, DocumentItem[]>;
+  pendingDocsCount?: number;
   notes: Record<string, InterviewerNote>;
   autoSaveStatus: 'saved' | 'saving' | 'error';
   setAutoSaveStatus: (status: 'saved' | 'saving' | 'error') => void;
@@ -191,6 +192,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         recentActivities: interviewRecords.recentActivities,
         answers: answersState.answersMap,
         checklists: checklistState.checklistsMap,
+        pendingDocsCount: checklistState.pendingDocsCount,
         notes: notesState.notesMap,
         autoSaveStatus,
         setAutoSaveStatus,

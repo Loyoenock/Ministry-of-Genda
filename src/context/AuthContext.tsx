@@ -6,7 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { INITIAL_CURRENT_USER, ADMIN_USER } from '../lib/mockData';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, createIsolatedAuthClient } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { mapSignInError, mapSignUpError, mapResendError, AuthErrorCode } from '../lib/authErrorMapper';
 import { isAllowedEmail, UNAUTHORIZED_DOMAIN_MESSAGE } from '../lib/validation';
@@ -828,7 +828,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? crypto.randomUUID()
         : `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
-    const userRecord: UserProfile = {
+    let userRecord: UserProfile = {
       ...newUser,
       id: generatedId,
       avatar_url:
@@ -838,15 +838,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && actualRole === 'admin') {
       try {
-        const { error } = await supabase.from('profiles').insert({
-          id: generatedId,
+        let authUserId = generatedId;
+
+        // Provision user in auth.users first so public.profiles.id satisfies foreign key constraint profiles_id_fkey
+        const isolatedClient = typeof createIsolatedAuthClient === 'function' ? createIsolatedAuthClient() : null;
+        if (isolatedClient && typeof isolatedClient.auth?.signUp === 'function') {
+          const tempPassword = `MGLSD-${crypto.randomUUID().slice(0, 8)}!Aa1`;
+          const { data: authData, error: authErr } = await isolatedClient.auth.signUp({
+            email: userRecord.email,
+            password: tempPassword,
+            options: {
+              data: {
+                full_name: userRecord.full_name,
+                department_unit: userRecord.department_unit,
+                role: userRecord.role,
+              },
+            },
+          });
+
+          if (authData?.user?.id) {
+            authUserId = authData.user.id;
+            userRecord.id = authUserId;
+          } else if (authErr) {
+            console.error('Error creating auth account for user:', authErr.message);
+            triggerError('Failed to create user in database: ' + authErr.message);
+            return { error: authErr };
+          }
+        }
+
+        const profilePayload = {
+          id: authUserId,
           email: userRecord.email,
           full_name: userRecord.full_name,
           role: userRecord.role,
           department_unit: userRecord.department_unit,
           phone_number: userRecord.phone_number || null,
           avatar_url: userRecord.avatar_url,
-        });
+        };
+
+        const profilesTable = supabase.from('profiles') as any;
+        const { error } =
+          typeof profilesTable.upsert === 'function'
+            ? await profilesTable.upsert(profilePayload, { onConflict: 'id' })
+            : await profilesTable.insert(profilePayload);
+
         if (error) {
           console.error('Error adding user to Supabase:', error.message);
           triggerError('Failed to create user in database: ' + error.message);
