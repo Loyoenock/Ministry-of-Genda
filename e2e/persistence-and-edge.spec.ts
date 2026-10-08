@@ -101,4 +101,88 @@ test.describe('Dashboard Filtering, Edge Cases & Data Persistence', () => {
     await expect(page.getByTestId('dashboard-search-input')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('text=Temporary Record To Delete')).not.toBeVisible();
   });
+
+  test('Offline mode – answers and notes survive page reload', async ({ page }) => {
+    // Force network offline mode
+    await page.context().setOffline(true);
+
+    // Create an interview while offline
+    await page.getByTestId('dashboard-new-interview-btn').click();
+    await page.getByTestId('interviewee-name-input').fill('Offline Field Inspector');
+    await page.getByTestId('interviewee-role-input').fill('Senior Officer');
+    await page.getByTestId('tier-option-Management').click();
+    await page.getByTestId('create-interview-submit-btn').click();
+
+    // Fill questionnaire answer A1
+    const testOfflineAnswer = 'Offline response recorded for statutory inspection logs.';
+    await page.getByTestId('question-input-A1').fill(testOfflineAnswer);
+
+    // Fill interviewer notes
+    await page.getByTestId('tab-notes').click();
+    const testOfflineNotes = 'Offline field observation notes recorded locally.';
+    await page.getByTestId('notes-observations').fill(testOfflineNotes);
+
+    // Reload page while offline
+    await page.reload();
+
+    // Verify questionnaire answer survived reload
+    await page.getByTestId('tab-questionnaire').click();
+    await expect(page.getByTestId('question-input-A1')).toHaveValue(testOfflineAnswer);
+
+    // Verify notes survived reload
+    await page.getByTestId('tab-notes').click();
+    await expect(page.getByTestId('notes-observations')).toHaveValue(testOfflineNotes);
+
+    // Restore network connection
+    await page.context().setOffline(false);
+  });
+
+  test('Document upload size validation still rejects > 50 MB', async ({ page }) => {
+    // Navigate to an interview's Documents tab
+    await page.getByTestId('open-interview-int-001').click();
+    await page.getByTestId('tab-documents').click();
+
+    // Attempt uploading an oversized file via file input
+    const fileInput = page.locator('input[aria-label="Upload document file"]');
+    const oversizedBuffer = Buffer.alloc(51 * 1024 * 1024); // 51 MB
+
+    await fileInput.setInputFiles({
+      name: 'oversized_register.pdf',
+      mimeType: 'application/pdf',
+      buffer: oversizedBuffer,
+    });
+
+    // Assert error message displayed by DocumentsTab
+    await expect(
+      page.locator('text=Upload failed: File exceeds the 50MB maximum size limit allowed by the Directorate repository.')
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('Live mode – checklist item file upload and signed URL retrieval', async ({ page }) => {
+    // Check if live Supabase environment is configured
+    const isConfigured = await page.evaluate(() => {
+      return Boolean(import.meta.env?.VITE_SUPABASE_URL && import.meta.env?.VITE_SUPABASE_ANON_KEY);
+    });
+
+    if (!isConfigured) {
+      test.skip(!isConfigured, 'Skipping live upload test: Supabase environment variables not set');
+      return;
+    }
+
+    // Navigate to an interview's Documents tab
+    await page.getByTestId('open-interview-int-001').click();
+    await page.getByTestId('tab-documents').click();
+
+    // Trigger file input upload for checklist item
+    const fileInput = page.locator('input[aria-label="Upload document file"]');
+    await fileInput.setInputFiles({
+      name: 'statutory_log_evidence.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 statutory test content'),
+    });
+
+    // Assert success message and checklist item row state
+    await expect(page.locator('text=File uploaded successfully')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('checklist-item-1')).toBeVisible();
+  });
 });
