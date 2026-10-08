@@ -729,7 +729,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - Demo mode (isSupabaseConfigured === false): allows role switching.
    */
   const switchRole = (newRole: UserRole) => {
-    if (isSupabaseConfigured && !isTestEnv) {
+    // PRODUCTION SAFETY GUARD: MUST NEVER BE REMOVED.
+    // When Supabase is configured, role switching is strictly disabled to ensure no demo/mock users can become active.
+    if (isSupabaseConfigured) {
       return;
     }
 
