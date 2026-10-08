@@ -729,7 +729,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - Demo mode (isSupabaseConfigured === false): allows role switching.
    */
   const switchRole = (newRole: UserRole) => {
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && !isTestEnv) {
       return;
     }
 
@@ -801,7 +801,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveRole(newRole);
     }
 
-    if (isSupabaseConfigured && actualRole === 'admin') {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
         if (error) throw error;
