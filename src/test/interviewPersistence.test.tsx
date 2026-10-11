@@ -392,6 +392,7 @@ describe('InterviewContext Supabase Persistence & State Operations', () => {
       const { createInterview, selectInterview } = useInterviews();
 
       useEffect(() => {
+        if (createdInterviewId) return;
         const created = createInterview({
           interviewee_name: 'Dr. Jane Akello',
           role_title: 'Commissioner OSH',
@@ -435,6 +436,12 @@ describe('InterviewContext Supabase Persistence & State Operations', () => {
       fireEvent.change(answerInput, {
         target: { value: 'Direct form test answer entered before debounce' },
       });
+    });
+
+    // Navigate to the last section so the Finish Interview button is rendered
+    const sectionNavButtons = screen.getAllByTestId(/^section-nav-/);
+    act(() => {
+      fireEvent.click(sectionNavButtons[sectionNavButtons.length - 1]);
     });
 
     // Zero time elapsed, click finish

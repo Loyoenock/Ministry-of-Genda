@@ -87,3 +87,77 @@ To verify that the application is running against a live, configured Supabase ba
 ## Continuous Integration & Build Commands
 
 Refer to `.github/workflows/ci.yml` for automated continuous integration steps (`install`, `lint`, `test`, `build`).
+
+---
+
+## 6. Staging Environment Checklist
+
+To deploy and validate a Staging / Pre-Production environment before promoting changes to Production:
+
+1. **Configure Environment Variables**:
+   Set the following keys in your staging hosting environment (referencing `.env.example` placeholders):
+   ```env
+   VITE_SUPABASE_URL=https://your-staging-project-ref.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-staging-anon-key-here
+   SUPABASE_SERVICE_ROLE_KEY=your-staging-service-role-key-here
+   ```
+
+2. **Execute Database Seeding**:
+   Run the statutory question catalogue seed script against the staging database:
+   ```bash
+   npm run db:seed
+   ```
+
+3. **Verify User Email Confirmation & Auth**:
+   Register a test MGLSD staff account and confirm the email address using either the Supabase Dashboard (**Authentication → Users → Confirm Email**) or via SQL:
+   ```sql
+   UPDATE auth.users
+   SET email_confirmed_at = NOW()
+   WHERE email = 'staging.officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
+   ```
+
+4. **Confirm Staging Health Check**:
+   Navigate to the `/support` page and verify that the **Database & Master Catalogue Health Check** reports `isSupabaseConfigured === true` connected to the staging project reference.
+
+---
+
+## 7. Secrets Rotation
+
+Operators must periodically rotate API keys or handle compromised credentials following these procedures:
+
+1. **Client Anon Key (`VITE_SUPABASE_ANON_KEY`)**:
+   - Generate a new anon key in Supabase Dashboard (**Project Settings → API**).
+   - Update the `VITE_SUPABASE_ANON_KEY` environment variable in your deployment platform settings.
+   - Re-deploy or trigger a new build so client bundles pick up the updated key.
+
+2. **Service Role Key (`SUPABASE_SERVICE_ROLE_KEY`)**:
+   - Generate a new service role key in Supabase Dashboard (**Project Settings → API**).
+   - Update `SUPABASE_SERVICE_ROLE_KEY` in your CLI execution environment or secure CI/CD pipeline secrets.
+   - **CRITICAL SECURITY RULE**: Never expose the service role key under a `VITE_` prefix or check it into source control. It bypasses Row-Level Security (RLS) and must strictly remain CLI/server-only.
+
+---
+
+## 8. Backup & Restore Runbook
+
+Operators should maintain regular database backups and know how to execute manual user/data maintenance routines.
+
+1. **Automated & Manual Database Backups**:
+   - Open [Supabase Dashboard](https://app.supabase.com) → **Database** → **Backups**.
+   - Verify that automated daily backups are active.
+   - Click **Take Backup** to create an on-demand point-in-time snapshot prior to major migrations or administrative updates.
+
+2. **Restoring Data & Triage SQL**:
+   - To restore from a backup snapshot, select the desired backup under **Database → Backups** and click **Restore**.
+   - **Check Account Confirmation Status**:
+     ```sql
+     SELECT id, email, email_confirmed_at, created_at
+     FROM auth.users
+     WHERE email = 'officer@mglsd.go.ug';
+     ```
+   - **Manually Confirm Unconfirmed User**:
+     ```sql
+     UPDATE auth.users
+     SET email_confirmed_at = NOW()
+     WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
+     ```
+

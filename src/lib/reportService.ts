@@ -159,12 +159,20 @@ export async function fetchInterviewReportData(
       return { data: null, error: 'Interview record could not be loaded.' };
     }
 
-    // 2. Role-Based Visibility Check
-    if (!isAdmin && currentUser && interview.interviewer_id) {
-      if (interview.interviewer_id !== currentUser.id) {
+    // 2. Authorization check: Admins can view any, Interviewers can view their own or same department
+    if (!isAdmin && currentUser) {
+      const isOwner = interview.interviewer_id === currentUser.id;
+      const targetDept = interviewerProfile?.department_unit || interview.department_unit;
+      const isSameDept = Boolean(
+        currentUser.department_unit &&
+        targetDept &&
+        currentUser.department_unit.trim().toLowerCase() === targetDept.trim().toLowerCase()
+      );
+
+      if (!isOwner && !isSameDept) {
         return {
           data: null,
-          error: 'UNAUTHORIZED: You do not have permission to view or export diagnostic briefs for interviews conducted by another officer.',
+          error: 'UNAUTHORIZED: You do not have permission to view or export reports for this interview session.',
         };
       }
     }
@@ -273,13 +281,6 @@ export async function fetchAnalyticsDataset(
       let query: any = supabase
         .from('interviews')
         .select('*, profiles:interviewer_id(full_name, department_unit, email)');
-
-      // Enforce RLS on client query
-      if (!isAdmin && currentUser && isUuid(currentUser.id)) {
-        if (typeof query.eq === 'function') {
-          query = query.eq('interviewer_id', currentUser.id);
-        }
-      }
 
       if (typeof query.order === 'function') {
         query = query.order('created_at', { ascending: false });

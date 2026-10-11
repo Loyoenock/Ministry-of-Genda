@@ -4,8 +4,17 @@
  */
 
 import React, { useEffect } from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+
+vi.mock('../lib/supabase', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/supabase')>();
+  return {
+    ...actual,
+    isSupabaseConfigured: false,
+  };
+});
+
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { InterviewProvider, useInterviews } from '../context/InterviewContext';
 

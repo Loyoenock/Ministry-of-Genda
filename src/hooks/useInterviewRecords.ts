@@ -118,6 +118,9 @@ export function useInterviewRecords({
 
   // RLS Visibility
   const visibleInterviews = useMemo(() => {
+    if (isSupabaseConfigured) {
+      return allInterviews;
+    }
     return isAdmin
       ? allInterviews
       : allInterviews.filter((it) => (userId ? it.interviewer_id === userId : true));

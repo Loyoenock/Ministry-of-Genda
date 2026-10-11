@@ -211,17 +211,10 @@ export async function fetchInterviewsFromSupabase(
   }
 
   try {
-    let query = supabase
+    const { data, error } = await supabase
       .from('interviews')
       .select('*, profiles:interviewer_id(full_name)')
       .order('created_at', { ascending: false });
-
-    // Client-side guard aligned with RLS
-    if (!isAdmin && userId && isUuid(userId)) {
-      query = query.eq('interviewer_id', userId);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.warn('Supabase fetch interviews notice:', error.message);
