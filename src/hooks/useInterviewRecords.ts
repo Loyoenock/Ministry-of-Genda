@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Interview, RecentActivityItem } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
@@ -29,6 +29,12 @@ export function useInterviewRecords({
   onInterviewCreated,
   onInterviewSelected,
 }: UseInterviewRecordsOptions) {
+  const onInterviewCreatedRef = useRef(onInterviewCreated);
+  onInterviewCreatedRef.current = onInterviewCreated;
+
+  const onInterviewSelectedRef = useRef(onInterviewSelected);
+  onInterviewSelectedRef.current = onInterviewSelected;
+
   // Pure Supabase-driven interviews state; single source of truth
   const [allInterviews, setAllInterviews] = useState<Interview[]>([]);
   const [activeInterviewId, setActiveInterviewId] = useState<string | null>(null);
@@ -132,10 +138,10 @@ export function useInterviewRecords({
 
   const selectInterview = useCallback((id: string | null) => {
     setActiveInterviewId(id);
-    if (id && onInterviewSelected) {
-      onInterviewSelected(id);
+    if (id && onInterviewSelectedRef.current) {
+      onInterviewSelectedRef.current(id);
     }
-  }, [onInterviewSelected]);
+  }, []);
 
   const addRecentActivity = useCallback((item: RecentActivityItem) => {
     setSessionActivities((prev) => [item, ...prev.slice(0, 7)]);
@@ -170,8 +176,8 @@ export function useInterviewRecords({
       });
 
       // Callback to initialize related sub-data in memory & Supabase
-      if (onInterviewCreated) {
-        onInterviewCreated(newInterview);
+      if (onInterviewCreatedRef.current) {
+        onInterviewCreatedRef.current(newInterview);
       }
 
       // Persist to Supabase
@@ -192,7 +198,7 @@ export function useInterviewRecords({
 
       return newInterview;
     },
-    [addRecentActivity, onInterviewCreated]
+    [addRecentActivity]
   );
 
   const updateInterview = useCallback((id: string, updates: Partial<Interview>) => {

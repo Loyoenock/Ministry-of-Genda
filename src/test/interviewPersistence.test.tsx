@@ -10,7 +10,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { InterviewProvider, useInterviews } from '../context/InterviewContext';
 import { useInterviewFormState } from '../hooks/useInterviewFormState';
 import { DynamicInterviewForm } from '../components/DynamicInterviewForm';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MASTER_QUESTIONS } from '../lib/questionsData';
 import { updateQuestionsCache } from '../lib/questionsService';
 
@@ -461,3 +461,107 @@ describe('InterviewContext Supabase Persistence & State Operations', () => {
     ).toBe(true);
   });
 });
+
+describe('Test Environment & Stability Regression Guards', () => {
+  it('fails if test.env is removed (asserts isSupabaseConfigured defaults true in the test environment)', () => {
+    // Fails if test.env is omitted from vitest.config.ts when run without shell env vars
+    expect(isSupabaseConfigured).toBe(true);
+    expect(import.meta.env.VITE_SUPABASE_URL).toBeTruthy();
+    expect(import.meta.env.VITE_SUPABASE_ANON_KEY).toBeTruthy();
+  });
+
+  it('guards against OOM render loop: createInterview callback identity remains stable across re-renders', () => {
+    let renderCount = 0;
+    const createInterviewInstances: any[] = [];
+
+    function StabilityConsumer() {
+      const { createInterview } = useInterviews();
+      renderCount++;
+      createInterviewInstances.push(createInterview);
+
+      useEffect(() => {
+        if (renderCount > 25) {
+          throw new Error('OOM render loop detected: createInterview changed identity repeatedly in useEffect');
+        }
+      }, [createInterview]);
+
+      return <div data-testid="render-count">{renderCount}</div>;
+    }
+
+    const { rerender } = render(
+      <AuthProvider>
+        <InterviewProvider>
+          <StabilityConsumer />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    expect(renderCount).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <AuthProvider>
+        <InterviewProvider>
+          <StabilityConsumer />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    rerender(
+      <AuthProvider>
+        <InterviewProvider>
+          <StabilityConsumer />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    // Callback reference must be strictly identical across all renders
+    expect(createInterviewInstances.length).toBeGreaterThan(1);
+    createInterviewInstances.forEach((inst) => {
+      expect(inst).toBe(createInterviewInstances[0]);
+    });
+    expect(renderCount).toBeLessThan(10);
+  });
+
+  it('guards against OOM render loop when creating interview inside useEffect with [createInterview]', () => {
+    let effectExecutions = 0;
+
+    function EffectCreationComponent() {
+      const { createInterview } = useInterviews();
+
+      useEffect(() => {
+        effectExecutions++;
+        if (effectExecutions > 10) {
+          throw new Error('OOM render loop detected: createInterview triggered infinite re-renders');
+        }
+        createInterview({
+          interviewee_name: `Candidate ${effectExecutions}`,
+          role_title: 'Officer',
+          department_unit: 'Labour Unit',
+          years_in_role: 1,
+          interview_date: '2025-09-20',
+          interview_time: '10:00 AM',
+          location: 'Ministry HQ',
+          interviewer_id: 'usr-001',
+          interviewer_name: 'Tester',
+          tier: 'Leadership',
+          status: 'Draft',
+          duration_min: 30,
+        });
+      }, [createInterview]);
+
+      return <div>Created count: {effectExecutions}</div>;
+    }
+
+    render(
+      <AuthProvider>
+        <InterviewProvider>
+          <EffectCreationComponent />
+        </InterviewProvider>
+      </AuthProvider>
+    );
+
+    // Because createInterview is stable, effect runs exactly once on mount, preventing OOM loops
+    expect(effectExecutions).toBe(1);
+  });
+});
+

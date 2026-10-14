@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useRef } from 'react';
 import {
   Interview,
   Answer,
@@ -88,11 +88,18 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAutoSaveStatus,
   });
 
+  const answersStateRef = useRef<any>(null);
+
+  const { initChecklistForInterview, loadChecklistFromSupabase } = checklistState;
+  const { initNotesForInterview, loadNotesFromSupabase } = notesState;
+
   const handleInterviewCreated = useCallback(
     (newInterview: Interview) => {
-      checklistState.initChecklistForInterview(newInterview.id);
-      notesState.initNotesForInterview(newInterview.id);
-      answersState.initAnswersForInterview(newInterview.id);
+      initChecklistForInterview(newInterview.id);
+      initNotesForInterview(newInterview.id);
+      if (answersStateRef.current?.initAnswersForInterview) {
+        answersStateRef.current.initAnswersForInterview(newInterview.id);
+      }
 
       if (isSupabaseConfigured && isUuid(newInterview.id)) {
         fetchOrInitChecklistFromSupabase(newInterview.id)
@@ -102,21 +109,23 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
       }
     },
-    [checklistState, notesState]
+    [initChecklistForInterview, initNotesForInterview]
   );
 
   const handleInterviewSelected = useCallback(
     (id: string) => {
-      checklistState.initChecklistForInterview(id);
-      notesState.initNotesForInterview(id);
+      initChecklistForInterview(id);
+      initNotesForInterview(id);
 
       if (isSupabaseConfigured && isUuid(id)) {
-        answersState.loadAnswersFromSupabase(id);
-        checklistState.loadChecklistFromSupabase(id);
-        notesState.loadNotesFromSupabase(id);
+        if (answersStateRef.current?.loadAnswersFromSupabase) {
+          answersStateRef.current.loadAnswersFromSupabase(id);
+        }
+        loadChecklistFromSupabase(id);
+        loadNotesFromSupabase(id);
       }
     },
-    [checklistState, notesState]
+    [initChecklistForInterview, initNotesForInterview, loadChecklistFromSupabase, loadNotesFromSupabase]
   );
 
   const interviewRecords = useInterviewRecords({
@@ -132,6 +141,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     updateInterview: interviewRecords.updateInterview,
     setAutoSaveStatus,
   });
+  answersStateRef.current = answersState;
 
   const uploadDocumentFile = useCallback(
     async (interviewId: string, itemNumber: number, fileOrName: File | string) => {

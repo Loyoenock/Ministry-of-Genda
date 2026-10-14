@@ -16,6 +16,10 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'e2e/**'],
     fileParallelism: false,
+    env: {
+      VITE_SUPABASE_URL: 'https://test-project.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
   },
   resolve: {
     alias: {
