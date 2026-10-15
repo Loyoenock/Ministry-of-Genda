@@ -355,7 +355,11 @@ export async function deleteInterviewFromSupabase(id: string): Promise<boolean> 
   if (!isSupabaseConfigured || !isUuid(id)) return false;
 
   try {
-    const { error } = await supabase.from('interviews').delete().eq('id', id);
+    const { error } = await supabase
+      .from('interviews')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
+
     if (error) {
       console.warn('Supabase delete interview notice:', error.message);
       return false;
@@ -913,6 +917,18 @@ export async function getDocumentSignedUrl(
     if (error || !data?.signedUrl) {
       const userMsg = parseStorageError(error || 'Failed to generate signed download link.');
       throw new Error(userMsg);
+    }
+
+    // Non-blocking download audit event logging
+    try {
+      supabase.rpc('log_document_download', { storage_path: storagePath }).then(
+        ({ error: rpcErr }) => {
+          if (rpcErr) console.warn('Document download audit log notice:', rpcErr.message);
+        },
+        (err) => console.warn('Document download audit log error:', err)
+      );
+    } catch {
+      // Silently continue so failures never break downloads
     }
 
     return data.signedUrl;

@@ -185,9 +185,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActualRole(mappedRole);
             setActiveRole(mappedRole);
           } else {
-            setCurrentUser(newProfile);
-            setActualRole('interviewer');
-            setActiveRole('interviewer');
+            // Profile insert failed and row cannot be selected (e.g. soft-deleted / deactivated).
+            // Do NOT silently re-create a profile in local memory for a soft-deleted user.
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            const deactivationErr = new Error(
+              insertErr.message?.includes('deactivated')
+                ? insertErr.message
+                : 'This account has been deactivated. Please contact an administrator.'
+            );
+            triggerError(deactivationErr.message);
+            throw deactivationErr;
           }
         } else {
           setCurrentUser(newProfile);
@@ -214,9 +222,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }));
         setUsers(mappedProfiles);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in fetchOrCreateProfile:', err);
-      if (authUser) {
+      if (err?.message?.includes('deactivated')) {
+        setCurrentUser(null);
+        throw err;
+      }
+      if (!isSupabaseConfigured && authUser) {
         const fallbackProfile: UserProfile = {
           id: authUser.id,
           email: authUser.email || '',
@@ -227,6 +239,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentUser(fallbackProfile);
         setActualRole('interviewer');
         setActiveRole('interviewer');
+      } else {
+        throw err;
       }
     } finally {
       setLoading(false);
@@ -468,11 +482,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         await fetchOrCreateProfile(data.user);
-      } catch (profileErr) {
+      } catch (profileErr: any) {
         console.error('fetchOrCreateProfile error during login:', profileErr);
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setLoading(false);
+        const err = new Error(profileErr?.message || 'This account has been deactivated.');
+        setAuthError(err.message);
+        return { error: err, code: 'INVALID_CREDENTIALS' };
       }
 
-      if (data.user) {
+      if (!isSupabaseConfigured && data.user) {
         const minimalProfile: UserProfile = {
           id: data.user.id,
           email: data.user.email || trimmedEmail,
@@ -966,11 +986,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && actualRole === 'admin') {
       try {
-        // First delete or clean up any interviews assigned to this interviewer if cascades aren't active yet
-        await supabase.from('interviews').delete().eq('interviewer_id', userId);
-
-        // Delete profile from public.profiles
-        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+        // Soft-delete profile from public.profiles (interviews and files are protected by ON DELETE RESTRICT)
+        const { error } = await supabase
+          .from('profiles')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', userId);
 
         if (error) {
           console.error('Error deleting user profile in Supabase:', error.message);
