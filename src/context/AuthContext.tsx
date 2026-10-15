@@ -532,8 +532,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: err, code: 'INVALID_CREDENTIALS' };
     }
 
-    if (trimmedPassword.length < 6) {
-      const err = new Error('Password must be at least 6 characters long.');
+    if (trimmedPassword.length < 12) {
+      const err = new Error('Password must be at least 12 characters long.');
       setAuthError(err.message);
       return { error: err, code: 'WEAK_PASSWORD' };
     }
@@ -661,8 +661,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updatePassword = async (newPassword: string): Promise<{ error: any; code?: AuthErrorCode }> => {
     const trimmedPassword = newPassword.trim();
 
-    if (trimmedPassword.length < 6) {
-      const err = new Error('Password must be at least 6 characters long.');
+    if (trimmedPassword.length < 12) {
+      const err = new Error('Password must be at least 12 characters long.');
       setAuthError(err.message);
       return { error: err, code: 'WEAK_PASSWORD' };
     }

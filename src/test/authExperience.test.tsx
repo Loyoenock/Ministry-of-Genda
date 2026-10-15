@@ -4,6 +4,8 @@
  */
 
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -15,6 +17,8 @@ import {
   validateFullName,
   isAllowedEmail,
   UNAUTHORIZED_DOMAIN_MESSAGE,
+  ALLOWED_EMAIL_DOMAINS,
+  MIN_PASSWORD_LENGTH,
 } from '../lib/validation';
 import {
   mapSignInError,
@@ -81,10 +85,10 @@ describe('Validation Utilities & Domain Restrictions', () => {
     // Sign in allows any existing password string
     expect(validatePassword('123', false).isValid).toBe(true);
 
-    // Sign up requires at least 6 characters
-    expect(validatePassword('12345', true).isValid).toBe(false);
-    expect(validatePassword('12345', true).errorMessage).toContain('at least 6 characters');
-    expect(validatePassword('SecurePass123', true).isValid).toBe(true);
+    // Sign up requires at least 12 characters
+    expect(validatePassword('12345678901', true).isValid).toBe(false);
+    expect(validatePassword('12345678901', true).errorMessage).toContain('at least 12 characters');
+    expect(validatePassword('SecurePass1234', true).isValid).toBe(true);
   });
 
   it('validates official full name for sign up', () => {
@@ -130,9 +134,9 @@ describe('Auth Error Mapping Engine', () => {
     expect(duplicate422.code).toBe('USER_ALREADY_EXISTS');
 
     // Weak password
-    const weakPass = mapSignUpError({ message: 'Password should be at least 6 characters' });
+    const weakPass = mapSignUpError({ message: 'Password should be at least 12 characters' });
     expect(weakPass.code).toBe('WEAK_PASSWORD');
-    expect(weakPass.message).toContain('Password is too weak');
+    expect(weakPass.message).toContain('at least 12 characters');
 
     // Rate limit
     const rateLimit = mapSignUpError({ status: 429, message: 'over_email_send_rate_limit' });
@@ -264,7 +268,7 @@ describe('LoginView Component - Domain Restrictions & Validation UX', () => {
     expect(passError.textContent).toContain('Please enter your account password.');
   });
 
-  it('enforces min 6 characters password in Create Account mode', async () => {
+  it('enforces min 12 characters password in Create Account mode', async () => {
     render(
       <AuthProvider>
         <LoginView />
@@ -287,7 +291,7 @@ describe('LoginView Component - Domain Restrictions & Validation UX', () => {
     fireEvent.blur(passInput);
 
     const passError = screen.getByTestId('password-error');
-    expect(passError.textContent).toContain('Password must be at least 6 characters long.');
+    expect(passError.textContent).toContain('Password must be at least 12 characters long.');
   });
 
   it('preserves email address when switching between Sign In and Create Account tabs', () => {
@@ -691,5 +695,80 @@ describe('Login Error Guidance & Enumeration Protection', () => {
     const alert = await screen.findByTestId('login-error-alert');
     expect(alert.textContent).toContain('Unable to connect to the authentication server');
     expect(screen.getByText('Retry')).toBeInTheDocument();
+  });
+});
+
+describe('Domain Policy & True-Gate SQL Synchronisation', () => {
+  it('asserts the TypeScript ALLOWED_EMAIL_DOMAINS list and SQL migration domain list match', () => {
+    // Locate the latest email domain migration file
+    const migrationsDir = path.resolve(__dirname, '../../supabase/migrations');
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.includes('email_domain'));
+    expect(files.length).toBeGreaterThan(0);
+
+    const latestMigration = files.sort().reverse()[0];
+    const migrationPath = path.join(migrationsDir, latestMigration);
+    const sqlContent = fs.readFileSync(migrationPath, 'utf-8');
+
+    // Parse domain_part IN (...) from migration
+    const match = sqlContent.match(/domain_part\s+IN\s*\(([^)]+)\)/i);
+    expect(match).toBeTruthy();
+    const sqlDomains = match![1]
+      .split(',')
+      .map((d) => d.trim().replace(/^['"]|['"]$/g, ''))
+      .filter((d) => d !== 'go.ug'); // go.ug is checked as root TLD
+
+    // Every domain in TS ALLOWED_EMAIL_DOMAINS must be present in SQL migration
+    ALLOWED_EMAIL_DOMAINS.forEach((tsDomain) => {
+      expect(sqlDomains).toContain(tsDomain);
+    });
+
+    // Every domain in SQL migration must be present in TS ALLOWED_EMAIL_DOMAINS
+    sqlDomains.forEach((sqlDomain) => {
+      expect(ALLOWED_EMAIL_DOMAINS).toContain(sqlDomain as any);
+    });
+  });
+
+  it('verifies BEFORE INSERT trigger on auth.users is declared in the migration', () => {
+    const migrationPath = path.resolve(
+      __dirname,
+      '../../supabase/migrations/20261014_auth_users_email_domain_enforcement.sql'
+    );
+    expect(fs.existsSync(migrationPath)).toBe(true);
+    const sqlContent = fs.readFileSync(migrationPath, 'utf-8');
+    expect(sqlContent).toContain('BEFORE INSERT OR UPDATE OF email ON auth.users');
+    expect(sqlContent).toContain('enforce_auth_user_email_domain');
+  });
+
+  it('maps auth.users trigger exception and opaque database error to friendly UNAUTHORIZED_DOMAIN_MESSAGE', () => {
+    // Direct trigger error raised from auth.users BEFORE INSERT
+    const directTriggerError = {
+      message:
+        'This email domain is not authorised. Please use a Gmail, Yahoo, Malaika Path, or official .go.ug email address.',
+    };
+    const directResult = mapSignUpError(directTriggerError);
+    expect(directResult.message).toBe(UNAUTHORIZED_DOMAIN_MESSAGE);
+    expect(directResult.code).toBe('INVALID_EMAIL');
+
+    // Opaque database error produced when inner trigger was caught by auth layer
+    const opaqueDbError = {
+      message: 'Database error saving new user',
+    };
+    const opaqueResult = mapSignUpError(opaqueDbError);
+    expect(opaqueResult.message).toBe(UNAUTHORIZED_DOMAIN_MESSAGE);
+    expect(opaqueResult.code).toBe('INVALID_EMAIL');
+  });
+
+  it('enforces 12 character minimum password policy on signup boundary', () => {
+    expect(MIN_PASSWORD_LENGTH).toBe(12);
+
+    // 11 characters fails
+    const elevenChars = validatePassword('Pass1234567', true);
+    expect(elevenChars.isValid).toBe(false);
+    expect(elevenChars.errorMessage).toBe('Password must be at least 12 characters long.');
+
+    // 12 characters passes
+    const twelveChars = validatePassword('Pass12345678', true);
+    expect(twelveChars.isValid).toBe(true);
+    expect(twelveChars.errorMessage).toBeUndefined();
   });
 });

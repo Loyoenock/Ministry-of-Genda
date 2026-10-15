@@ -647,11 +647,14 @@ limit 20;
    set email_confirmed_at = now()
    where email = 'officer@mglsd.go.ug';
    ```
-3. **Disabling Email Confirmation (Closed Ministry Deployment Trade-Off)**:
-   - To bypass email confirmation so sign-up returns an active session immediately:
-     - Navigate to **Authentication** → **Providers** → **Email** in the Supabase Dashboard.
-     - Uncheck **Confirm email**.
-   - *Trade-off*: While convenient for closed internal ministry deployments where SMTP servers may not be configured, keeping email confirmation enabled is strongly recommended for any publicly reachable deployment to prevent unauthorized sign-ups with unverified addresses.
+3. **Production SMTP Configuration (Mandatory for Production)**:
+   - Email confirmation **must remain enabled** (`Confirm email` ON) in production to guard against unauthorized or unverified accounts.
+   - Configure a dedicated custom SMTP provider in the Supabase Dashboard (**Authentication → SMTP Settings**):
+     - **Host**: `smtp.sendgrid.net`, `email-smtp.eu-west-1.amazonaws.com`, or official Uganda Government mail gateway.
+     - **Port**: `587` (TLS) or `465` (SSL).
+     - **Sender Email**: `noreply@mglsd.go.ug` (or verified domain address).
+     - **Sender Name**: `MGLSD Labour Directorate Diagnostic`.
+   - Configuring custom SMTP eliminates the default Supabase rate limits (3 emails/hour) and ensures reliable delivery of confirmation and password reset emails to government and external inbox domains.
 
 ---
 

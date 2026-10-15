@@ -66,7 +66,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
     // Fill form
     fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Jane Akello' } });
     fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'officer@mglsd.go.ug' } });
-    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password1234' } });
 
     // Submit
     await act(async () => {
@@ -99,7 +99,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
 
     fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Jane Akello' } });
     fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'existing@mglsd.go.ug' } });
-    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password1234' } });
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('login-submit-btn'));
@@ -130,7 +130,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
 
     fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Auto Officer' } });
     fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'officer.auto@mglsd.go.ug' } });
-    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password1234' } });
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('login-submit-btn'));
@@ -163,7 +163,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
 
     fireEvent.change(screen.getByTestId('login-fullname'), { target: { value: 'Resend Officer' } });
     fireEvent.change(screen.getByTestId('login-email'), { target: { value: 'officer.resend@mglsd.go.ug' } });
-    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByTestId('login-password'), { target: { value: 'password1234' } });
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('login-submit-btn'));
@@ -204,7 +204,7 @@ describe('Sign-up & Email Confirmation Flow', () => {
           <button
             data-testid="test-empty-signup"
             onClick={async () => {
-              const res = await signUp('empty@mglsd.go.ug', 'password123', 'Empty Officer');
+              const res = await signUp('empty@mglsd.go.ug', 'password1234', 'Empty Officer');
               if (res.error) {
                 setOutcome(`ERROR: ${res.error.message}`);
               } else {

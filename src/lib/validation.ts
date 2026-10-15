@@ -102,6 +102,11 @@ export interface PasswordValidationResult {
 }
 
 /**
+ * Minimum password length required for account creation and password updates.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
  * Validates password length and basic complexity.
  */
 export function validatePassword(password: string, isSignUp: boolean = false): PasswordValidationResult {
@@ -112,10 +117,10 @@ export function validatePassword(password: string, isSignUp: boolean = false): P
     };
   }
 
-  if (isSignUp && password.length < 6) {
+  if (isSignUp && password.length < MIN_PASSWORD_LENGTH) {
     return {
       isValid: false,
-      errorMessage: 'Password must be at least 6 characters long.',
+      errorMessage: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
     };
   }
 

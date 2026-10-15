@@ -59,6 +59,43 @@ WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
 
 ---
 
+## 3.1 Required Supabase Production Settings Checklist (Dashboard Configuration)
+
+Before promoting this application to production, operators must configure the following security settings in the Supabase Dashboard:
+
+1. **Email Confirmation (`Confirm email: ON`)**:
+   - Location: **Authentication → Providers → Email**.
+   - **Requirement**: `Confirm email` must be enabled. Do not disable email confirmation in production. This guarantees that only holders of active government and authorized mailboxes can complete account creation.
+
+2. **Custom SMTP Provider**:
+   - Location: **Project Settings → Authentication → SMTP Settings**.
+   - **Requirement**: Configure a dedicated custom SMTP server (e.g. Amazon SES, SendGrid, Resend, or Government Exchange SMTP):
+     - **Host**: Your verified SMTP server address (e.g. `email-smtp.eu-west-1.amazonaws.com`).
+     - **Port**: `587` (STARTTLS) or `465` (SSL).
+     - **Sender Email**: Official verified address (e.g. `noreply@mglsd.go.ug`).
+     - **Sender Name**: `MGLSD Labour Directorate Diagnostic`.
+   - **Rationale**: The Supabase built-in mailing service has strict default limits (3 emails/hour), which causes confirmation delays. Custom SMTP ensures immediate, unlimited transactional email delivery.
+
+3. **Password Security Policy**:
+   - Location: **Authentication → Security**.
+   - **Requirement**:
+     - **Minimum Password Length**: Set to **12 characters** (matching the TypeScript policy in `src/lib/validation.ts`).
+     - **Leaked Password Protection**: Toggle **ON** (automatically checks new passwords against the HaveIBeenPwned database to block compromised passwords).
+
+4. **Multi-Factor Authentication (MFA)**:
+   - Location: **Authentication → Multi-Factor (MFA)**.
+   - **Requirement**: Enable **App Authenticator (TOTP)**.
+   - **Admin Policy**: Administrators must be enrolled with TOTP MFA. See `docs/mfa-design.md` for technical design and recovery protocols.
+
+5. **Rate Limiting**:
+   - Location: **Project Settings → Authentication → Rate Limits**.
+   - **Requirement**:
+     - **Email Rate Limit**: Set to `30` emails per hour per user/IP.
+     - **Token Verification Limit**: Set to `60` attempts per minute.
+     - **Token Refresh Limit**: Set to `100` attempts per hour.
+
+---
+
 ## 4. Verifying `isSupabaseConfigured` in Production
 
 To verify that the application is running against a live, configured Supabase backend rather than Demo Mode:

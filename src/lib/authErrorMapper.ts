@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { UNAUTHORIZED_DOMAIN_MESSAGE } from './validation';
+
 export type AuthErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_NOT_CONFIRMED'
@@ -69,7 +71,7 @@ export function getAuthFeedback(
       };
     case 'WEAK_PASSWORD':
       return {
-        message: 'Password must be at least 6 characters. Use a stronger password for your ministry account.',
+        message: 'Password must be at least 12 characters. Use a stronger password for your ministry account.',
         code: 'WEAK_PASSWORD',
         severity: 'error',
       };
@@ -287,8 +289,22 @@ export function mapSignUpError(error: any): MappedAuthError {
         rawMessage.includes('pwned')))
   ) {
     return {
-      message: 'Password is too weak. Please use at least 6 characters including letters and numbers.',
+      message: 'Password is too weak. Please use at least 12 characters including letters and numbers.',
       code: 'WEAK_PASSWORD',
+    };
+  }
+
+  // Disallowed email domain or database trigger rejection
+  if (
+    rawMessage.includes('not authorised') ||
+    rawMessage.includes('not authorized') ||
+    rawMessage.includes('domain is not authorised') ||
+    rawMessage.includes('domain is not authorized') ||
+    rawMessage.includes('database error saving new user')
+  ) {
+    return {
+      message: UNAUTHORIZED_DOMAIN_MESSAGE,
+      code: 'INVALID_EMAIL',
     };
   }
 
