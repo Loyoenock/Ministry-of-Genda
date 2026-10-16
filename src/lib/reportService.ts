@@ -275,21 +275,44 @@ export async function fetchAnalyticsDataset(
   let rawInterviews: Interview[] = [];
   const notesMap: Record<string, InterviewerNote> = { ...fallbackNotes };
 
-  // 1. Fetch live interviews with profiles join
+  // 1. Fetch live interviews with profiles join (paged in chunks of 1000)
   if (isSupabaseConfigured) {
     try {
-      let query: any = supabase
-        .from('interviews')
-        .select('*, profiles:interviewer_id(full_name, department_unit, email)');
+      const allInterviewRows: any[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
 
-      if (typeof query.order === 'function') {
-        query = query.order('created_at', { ascending: false });
+      while (true) {
+        const to = from + PAGE_SIZE - 1;
+        let query: any = supabase
+          .from('interviews')
+          .select('*, profiles:interviewer_id(full_name, department_unit, email)');
+
+        if (typeof query.order === 'function') {
+          query = query.order('created_at', { ascending: false });
+        }
+        if (typeof query.range === 'function') {
+          query = query.range(from, to);
+        }
+
+        const { data, error } = await query;
+        if (error || !Array.isArray(data)) {
+          if (allInterviewRows.length === 0) {
+            rawInterviews = fallbackInterviews;
+          }
+          break;
+        }
+
+        allInterviewRows.push(...data);
+        if (data.length < PAGE_SIZE) {
+          break;
+        }
+        from += PAGE_SIZE;
       }
 
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        rawInterviews = data.map(mapRowToInterview);
-      } else {
+      if (allInterviewRows.length > 0) {
+        rawInterviews = allInterviewRows.map(mapRowToInterview);
+      } else if (rawInterviews.length === 0) {
         rawInterviews = fallbackInterviews;
       }
     } catch (e) {
@@ -355,23 +378,45 @@ export async function fetchAnalyticsDataset(
   });
 
   // 4. Fetch associated notes for filtered interviews to compute real maturity and metrics
+  // Chunk .in() list to <= 200 IDs per request and page each chunk in 1000-row batches
   const filteredIds = filteredInterviews.map((i) => i.id).filter(isUuid);
   if (isSupabaseConfigured && filteredIds.length > 0) {
     try {
-      let notesQuery: any = supabase
-        .from('interviewer_notes')
-        .select('*');
+      const ID_CHUNK_SIZE = 200;
+      const PAGE_SIZE = 1000;
 
-      if (typeof notesQuery.in === 'function') {
-        notesQuery = notesQuery.in('interview_id', filteredIds);
-      }
+      for (let i = 0; i < filteredIds.length; i += ID_CHUNK_SIZE) {
+        const idChunk = filteredIds.slice(i, i + ID_CHUNK_SIZE);
+        let from = 0;
 
-      const { data: dbNotes, error: notesErr } = await notesQuery;
+        while (true) {
+          const to = from + PAGE_SIZE - 1;
+          let notesQuery: any = supabase
+            .from('interviewer_notes')
+            .select('*');
 
-      if (!notesErr && Array.isArray(dbNotes)) {
-        dbNotes.forEach((row) => {
-          notesMap[row.interview_id] = mapRowToInterviewerNote(row);
-        });
+          if (typeof notesQuery.in === 'function') {
+            notesQuery = notesQuery.in('interview_id', idChunk);
+          }
+          if (typeof notesQuery.range === 'function') {
+            notesQuery = notesQuery.range(from, to);
+          }
+
+          const { data: dbNotes, error: notesErr } = await notesQuery;
+
+          if (notesErr || !Array.isArray(dbNotes)) {
+            break;
+          }
+
+          dbNotes.forEach((row) => {
+            notesMap[row.interview_id] = mapRowToInterviewerNote(row);
+          });
+
+          if (dbNotes.length < PAGE_SIZE) {
+            break;
+          }
+          from += PAGE_SIZE;
+        }
       }
     } catch (e) {
       console.warn('Notice: Error querying live interviewer notes for analytics:', e);

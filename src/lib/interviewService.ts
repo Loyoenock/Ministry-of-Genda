@@ -254,6 +254,99 @@ export async function fetchAllInterviewsGlobalFromSupabase(): Promise<Interview[
   }
 }
 
+const INTERVIEW_PAGE_SIZE = 1000;
+
+/**
+ * Fetch interviews with pagination and strict error bubbling (throws on failure).
+ * Pages through Supabase in chunks of 1000 until exhausted.
+ */
+export async function fetchInterviewsOrThrow(
+  userId?: string,
+  isAdmin: boolean = false
+): Promise<Interview[]> {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const allRows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + INTERVIEW_PAGE_SIZE - 1;
+    let query: any = supabase
+      .from('interviews')
+      .select('*, profiles:interviewer_id(full_name)');
+
+    if (typeof query.order === 'function') {
+      query = query.order('created_at', { ascending: false });
+    }
+    if (typeof query.range === 'function') {
+      query = query.range(from, to);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    allRows.push(...rows);
+
+    if (rows.length < INTERVIEW_PAGE_SIZE) {
+      break;
+    }
+
+    from += INTERVIEW_PAGE_SIZE;
+  }
+
+  return allRows.map(mapRowToInterview);
+}
+
+/**
+ * Fetch all interviews globally with pagination and strict error bubbling (throws on failure).
+ * Pages through Supabase in chunks of 1000 until exhausted.
+ */
+export async function fetchAllInterviewsGlobalOrThrow(): Promise<Interview[]> {
+  if (!isSupabaseConfigured) {
+    return [];
+  }
+
+  const allRows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + INTERVIEW_PAGE_SIZE - 1;
+    let query: any = supabase
+      .from('interviews')
+      .select('*, profiles:interviewer_id(full_name)');
+
+    if (typeof query.order === 'function') {
+      query = query.order('created_at', { ascending: false });
+    }
+    if (typeof query.range === 'function') {
+      query = query.range(from, to);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    allRows.push(...rows);
+
+    if (rows.length < INTERVIEW_PAGE_SIZE) {
+      break;
+    }
+
+    from += INTERVIEW_PAGE_SIZE;
+  }
+
+  return allRows.map(mapRowToInterview);
+}
+
 /**
  * Insert a new interview into Supabase
  */
@@ -355,10 +448,7 @@ export async function deleteInterviewFromSupabase(id: string): Promise<boolean> 
   if (!isSupabaseConfigured || !isUuid(id)) return false;
 
   try {
-    const { error } = await supabase
-      .from('interviews')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
+    const { error } = await supabase.from('interviews').delete().eq('id', id);
 
     if (error) {
       console.warn('Supabase delete interview notice:', error.message);
@@ -917,18 +1007,6 @@ export async function getDocumentSignedUrl(
     if (error || !data?.signedUrl) {
       const userMsg = parseStorageError(error || 'Failed to generate signed download link.');
       throw new Error(userMsg);
-    }
-
-    // Non-blocking download audit event logging
-    try {
-      supabase.rpc('log_document_download', { storage_path: storagePath }).then(
-        ({ error: rpcErr }) => {
-          if (rpcErr) console.warn('Document download audit log notice:', rpcErr.message);
-        },
-        (err) => console.warn('Document download audit log error:', err)
-      );
-    } catch {
-      // Silently continue so failures never break downloads
     }
 
     return data.signedUrl;

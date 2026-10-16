@@ -11,6 +11,8 @@ import {
   generateUuid,
   fetchInterviewsFromSupabase,
   fetchAllInterviewsGlobalFromSupabase,
+  fetchInterviewsOrThrow,
+  fetchAllInterviewsGlobalOrThrow,
   insertInterviewToSupabase,
   updateInterviewInSupabase,
   deleteInterviewFromSupabase,
@@ -54,13 +56,13 @@ export function useInterviewRecords({
 
     try {
       if (isAdmin) {
-        const globalList = await fetchAllInterviewsGlobalFromSupabase();
+        const globalList = await fetchAllInterviewsGlobalOrThrow();
         setAllInterviews(globalList);
       } else if (userId) {
-        const userList = await fetchInterviewsFromSupabase(userId, false);
+        const userList = await fetchInterviewsOrThrow(userId, false);
         setAllInterviews(userList);
       } else {
-        const allList = await fetchInterviewsFromSupabase();
+        const allList = await fetchInterviewsOrThrow();
         setAllInterviews(allList);
       }
     } catch (err: any) {

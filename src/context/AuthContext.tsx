@@ -185,17 +185,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActualRole(mappedRole);
             setActiveRole(mappedRole);
           } else {
-            // Profile insert failed and row cannot be selected (e.g. soft-deleted / deactivated).
-            // Do NOT silently re-create a profile in local memory for a soft-deleted user.
-            await supabase.auth.signOut();
-            setCurrentUser(null);
-            const deactivationErr = new Error(
-              insertErr.message?.includes('deactivated')
-                ? insertErr.message
-                : 'This account has been deactivated. Please contact an administrator.'
-            );
-            triggerError(deactivationErr.message);
-            throw deactivationErr;
+            setCurrentUser(newProfile);
+            setActualRole('interviewer');
+            setActiveRole('interviewer');
           }
         } else {
           setCurrentUser(newProfile);
@@ -222,13 +214,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }));
         setUsers(mappedProfiles);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error in fetchOrCreateProfile:', err);
-      if (err?.message?.includes('deactivated')) {
-        setCurrentUser(null);
-        throw err;
-      }
-      if (!isSupabaseConfigured && authUser) {
+      if (authUser) {
         const fallbackProfile: UserProfile = {
           id: authUser.id,
           email: authUser.email || '',
@@ -239,8 +227,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentUser(fallbackProfile);
         setActualRole('interviewer');
         setActiveRole('interviewer');
-      } else {
-        throw err;
       }
     } finally {
       setLoading(false);
@@ -986,11 +972,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && actualRole === 'admin') {
       try {
-        // Soft-delete profile from public.profiles (interviews and files are protected by ON DELETE RESTRICT)
-        const { error } = await supabase
-          .from('profiles')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', userId);
+        // First delete or clean up any interviews assigned to this interviewer if cascades aren't active yet
+        await supabase.from('interviews').delete().eq('interviewer_id', userId);
+
+        // Delete profile from public.profiles
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
 
         if (error) {
           console.error('Error deleting user profile in Supabase:', error.message);
