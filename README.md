@@ -686,4 +686,32 @@ When contributing to this repository, please adhere to the following development
 5. **UI Accessibility & Branding**: Use Tailwind utility classes following the established palette. Retain official Republic of Uganda emblems and high-contrast color standards.
 
 ---
+
+## 12. Deploying Edge Functions
+
+### Deploying the Server-Side PDF Edge Function (`generate-diagnostic-pdf`)
+The Supabase Edge Function `generate-diagnostic-pdf` generates official, tamper-evident Republic of Uganda Diagnostic Brief PDF dossiers directly within Supabase's edge runtime. Every generated PDF is cryptographically stamped with:
+- Interview UUID
+- Canonical Completion Timestamp (`completed_at`)
+- Generation Timestamp
+- SHA-256 Digest of the session record in the document footer
+
+#### Deployment Instructions
+1. Install and authenticate the Supabase CLI:
+   ```bash
+   npm install -g supabase
+   supabase login
+   supabase link --project-ref <your-project-ref>
+   ```
+2. Deploy the `generate-diagnostic-pdf` function:
+   ```bash
+   supabase functions deploy generate-diagnostic-pdf
+   ```
+   *Note: Because the function evaluates caller JWTs directly via PostgREST headers (`Authorization: Bearer <token>`), RLS policies are strictly enforced for callers without requiring the service-role key.*
+
+3. Client Activation:
+   Set `VITE_ENABLE_SERVER_PDF=true` in your deployment environment variables when ready to enable edge PDF generation. When `false` (default), the application continues using the established client-side HTML dossier download.
+
+---
 *For administrative questions or diagnostic questionnaire updates, contact the MGLSD TRANSFORMATIVE Programme Technical Working Group.*
+

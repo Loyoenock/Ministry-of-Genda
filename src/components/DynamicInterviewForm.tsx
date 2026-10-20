@@ -39,6 +39,14 @@ interface DynamicInterviewFormProps {
   onBack: () => void;
 }
 
+const isLiveTranscriptionEnabled =
+  typeof import.meta !== 'undefined' &&
+  import.meta.env?.VITE_ENABLE_LIVE_TRANSCRIPTION === 'true';
+
+const LiveTranscriptionWidget = isLiveTranscriptionEnabled
+  ? React.lazy(() => import('../features/transcription/components/LiveTranscriptionPanel'))
+  : null;
+
 export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
   interviewId,
   onBack,
@@ -647,6 +655,16 @@ export const DynamicInterviewForm: React.FC<DynamicInterviewFormProps> = ({
           onNumbersCapturedChange={handleNumbersCapturedChange}
           onMaturityScoreChange={handleMaturityScoreChange}
         />
+      )}
+
+      {/* Live Audio Streaming Transcription Integration Point */}
+      {LiveTranscriptionWidget && (
+        <React.Suspense fallback={null}>
+          <LiveTranscriptionWidget
+            interviewId={interview.id}
+            activeSectionCode={activeSectionCode}
+          />
+        </React.Suspense>
       )}
     </div>
   );

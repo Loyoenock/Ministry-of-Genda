@@ -57,6 +57,7 @@ export type InterviewRowInput = Record<string, unknown> & {
   completion_percentage?: number | string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  completed_at?: string | null;
 };
 
 /**
@@ -83,6 +84,7 @@ export function mapRowToInterview(row: InterviewRowInput): Interview {
     completion_percentage: Number(row.completion_percentage) || 0,
     created_at: row.created_at || '',
     updated_at: row.updated_at || '',
+    completed_at: (row.completed_at as string) || null,
   };
 }
 

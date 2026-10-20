@@ -25,7 +25,7 @@ import { supabase } from '../lib/supabase';
 import { ConfirmationPanel } from './login/ConfirmationPanel';
 
 export const LoginView: React.FC = () => {
-  const { login, signUp, resetPassword, updatePassword } = useAuth();
+  const { login, signUp, resetPassword, updatePassword, authError } = useAuth();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
@@ -58,11 +58,17 @@ export const LoginView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Authentication feedback banners
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(authError || null);
   const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [isConfirmationRequired, setIsConfirmationRequired] = useState(false);
+
+  useEffect(() => {
+    if (authError) {
+      setErrorMessage(authError);
+    }
+  }, [authError]);
 
   const handleResendConfirmation = async () => {
     const trimmedEmail = email.trim();

@@ -783,3 +783,101 @@ export function generateDiagnosticBriefPdf(data: DiagnosticBriefData): void {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Calls the Supabase Edge Function to generate an official cryptographic diagnostic brief PDF.
+ * Gated behind the VITE_ENABLE_SERVER_PDF feature flag (default false).
+ * Returns null if the feature flag is disabled.
+ */
+export async function generateDiagnosticPdf(interviewId: string): Promise<Blob | null> {
+  const isServerPdfEnabled = import.meta.env.VITE_ENABLE_SERVER_PDF === 'true';
+  if (!isServerPdfEnabled) {
+    return null;
+  }
+
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  if (!isUuid(interviewId)) {
+    throw new Error(`Invalid interview ID UUID: ${interviewId}`);
+  }
+
+  const { data, error } = await supabase.functions.invoke('generate-diagnostic-pdf', {
+    body: { interview_id: interviewId },
+  });
+
+  if (error) {
+    console.error('Error invoking generate-diagnostic-pdf edge function:', error);
+    throw error;
+  }
+
+  if (data instanceof Blob) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Blob([data], { type: 'application/pdf' });
+  }
+  if (data && typeof data === 'object') {
+    return new Blob([JSON.stringify(data)], { type: 'application/pdf' });
+  }
+
+  return (data as Blob) || null;
+}
+
+/**
+ * Client helper to download the official server-generated diagnostic PDF.
+ * Invokes the Supabase Edge Function 'generate-diagnostic-pdf'.
+ * Falls back to the client-side HTML Blob download if the function fails, is unreachable,
+ * returns non-200, or if VITE_ENABLE_SERVER_PDF is disabled.
+ */
+export async function downloadServerDiagnosticPdf(
+  interviewId: string,
+  fallbackData?: DiagnosticBriefData
+): Promise<void> {
+  const isServerPdfEnabled = import.meta.env.VITE_ENABLE_SERVER_PDF === 'true';
+
+  if (!isServerPdfEnabled) {
+    let data = fallbackData;
+    if (!data) {
+      const res = await fetchInterviewReportData(interviewId);
+      if (!res.data) {
+        throw new Error(res.error || 'Failed to fetch interview report data for fallback download');
+      }
+      data = res.data;
+    }
+    generateDiagnosticBriefPdf(data);
+    return;
+  }
+
+  try {
+    const blob = await generateDiagnosticPdf(interviewId);
+    if (!blob) {
+      throw new Error('Server PDF generation returned no data');
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Diagnostic_Brief_${interviewId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.warn(
+      'Server PDF generation failed or unreachable, falling back to HTML Blob download:',
+      err
+    );
+    let data = fallbackData;
+    if (!data) {
+      const res = await fetchInterviewReportData(interviewId);
+      if (!res.data) {
+        throw new Error(res.error || 'Failed to fetch interview report data for fallback download');
+      }
+      data = res.data;
+    }
+    generateDiagnosticBriefPdf(data);
+  }
+}
+

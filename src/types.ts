@@ -110,6 +110,7 @@ export interface Interview {
   completion_percentage: number;
   created_at: string;
   updated_at: string;
+  completed_at?: string | null;
 }
 
 export interface RecentActivityItem {

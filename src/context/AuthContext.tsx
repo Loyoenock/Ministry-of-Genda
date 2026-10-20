@@ -65,6 +65,11 @@ const TEST_USERS: UserProfile[] = [
   },
 ];
 
+let enableAuthListenerForTesting = false;
+export function setEnableAuthListenerForTesting(val: boolean): void {
+  enableAuthListenerForTesting = val;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test';
 
@@ -113,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (fetchErr && fetchErr.code !== 'PGRST116') {
         console.warn('Notice: Could not fetch profile from Supabase:', fetchErr.message);
+        throw fetchErr;
       }
 
       if (profileRow) {
@@ -164,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (insertErr) {
           console.error('[profiles] insert failed', insertErr);
           // Re-select row in case trigger won the race or row already exists
-          const { data: retryRow } = await supabase
+          const { data: retryRow, error: retryErr } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
@@ -185,9 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setActualRole(mappedRole);
             setActiveRole(mappedRole);
           } else {
-            setCurrentUser(newProfile);
-            setActualRole('interviewer');
-            setActiveRole('interviewer');
+            throw insertErr || retryErr || new Error('Failed to create or fetch user profile.');
           }
         } else {
           setCurrentUser(newProfile);
@@ -214,20 +218,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }));
         setUsers(mappedProfiles);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in fetchOrCreateProfile:', err);
-      if (authUser) {
-        const fallbackProfile: UserProfile = {
-          id: authUser.id,
-          email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || 'Labour Officer',
-          role: 'interviewer',
-          department_unit: authUser.user_metadata?.department_unit || 'Labour Directorate',
-        };
-        setCurrentUser(fallbackProfile);
-        setActualRole('interviewer');
-        setActiveRole('interviewer');
+      // Fail-closed behaviour: if profile cannot be fetched or created,
+      // sign out through existing signOut path and set authError
+      try {
+        if (typeof supabase.auth?.signOut === 'function') {
+          await supabase.auth.signOut();
+        }
+      } catch (signOutErr) {
+        console.warn('Sign out during fail-closed profile fetch notice:', signOutErr);
       }
+      setCurrentUser(null);
+      setSession(null);
+      setActualRole('interviewer');
+      setActiveRole('interviewer');
+
+      const mapped = mapSignInError(err);
+      setAuthError(mapped.message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -235,7 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Supabase Auth listener
   useEffect(() => {
-    if (isTestEnv) {
+    if (isTestEnv && !enableAuthListenerForTesting) {
       setLoading(false);
       return;
     }
@@ -278,7 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Subscribe to auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
       try {
         setSession(newSession);
@@ -289,7 +298,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (newSession?.user) {
-            await fetchOrCreateProfile(newSession.user);
+            // Move Supabase calls out of onAuthStateChange callback body; only schedule work
+            setTimeout(() => {
+              if (!isMounted) return;
+              fetchOrCreateProfile(newSession.user).catch((err) => {
+                console.error('Error in scheduled fetchOrCreateProfile:', err);
+              });
+            }, 0);
+          } else {
+            setLoading(false);
           }
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
@@ -470,12 +487,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await fetchOrCreateProfile(data.user);
       } catch (profileErr: any) {
         console.error('fetchOrCreateProfile error during login:', profileErr);
-        await supabase.auth.signOut();
+        if (typeof supabase.auth?.signOut === 'function') {
+          await supabase.auth.signOut().catch(() => {});
+        }
         setCurrentUser(null);
+        setSession(null);
         setLoading(false);
-        const err = new Error(profileErr?.message || 'This account has been deactivated.');
-        setAuthError(err.message);
-        return { error: err, code: 'INVALID_CREDENTIALS' };
+        const mapped = mapSignInError(profileErr);
+        setAuthError(mapped.message);
+        return { error: new Error(mapped.message), code: mapped.code };
       }
 
       if (!isSupabaseConfigured && data.user) {

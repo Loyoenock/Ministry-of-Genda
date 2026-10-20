@@ -198,3 +198,39 @@ Operators should maintain regular database backups and know how to execute manua
      WHERE email = 'officer@mglsd.go.ug' AND email_confirmed_at IS NULL;
      ```
 
+
+
+---
+
+## 9. Live Audio Transcription Infrastructure & Edge Function Secrets
+
+When live streaming transcription is enabled (`VITE_ENABLE_LIVE_TRANSCRIPTION=true`), operators must configure secrets for the `transcription-token` Edge Function and verify hosting CSP / Permissions-Policy headers.
+
+### 9.1 Required Edge Function Secrets
+
+Configure via Supabase CLI (`supabase secrets set`) or Supabase Dashboard (**Project Settings → Edge Functions → Secrets**):
+
+| Secret Name | Required | Description | Example / Target Value |
+| :--- | :--- | :--- | :--- |
+| `TRANSCRIPTION_PROVIDER` | Yes | Target streaming provider adapter | `deepgram` (or `selfhosted` / `assemblyai`) |
+| `DEEPGRAM_API_KEY` | Conditional | Provider API key (used exclusively by Edge Function to mint ephemeral tokens) | `e2a4...` (Never commit or expose client-side) |
+| `TRANSCRIPTION_SIGNING_KEY` | Yes | Ephemeral token signing key for HMAC-SHA256 JWT minting | `hex-or-base64-random-secret-32-bytes` |
+| `ALLOWED_APP_ORIGINS` | Yes | Comma-separated list of permitted web origins for CORS | `https://diagnostic.mglsd.go.ug,http://localhost:3000` |
+| `ENABLE_LIVE_TRANSCRIPTION` | Optional | Server-side kill switch for token issuance | `true` (default) or `false` |
+
+> **Security Rule**: Provider credentials (`DEEPGRAM_API_KEY`) and signing keys must live **exclusively** inside Supabase Edge Function secrets. They must never be prefixed with `VITE_` or included in the browser bundle.
+
+### 9.2 Content Security Policy (CSP) & Permissions-Policy Configuration
+*(Document only: to be applied to production hosting configuration e.g. `vercel.json` in Prompt 7)*
+
+1. **`connect-src` CSP Directive**:
+   WebSocket streaming requires permitting the provider's secure WebSocket endpoint in addition to Supabase:
+   ```text
+   connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.deepgram.com;
+   ```
+
+2. **`Permissions-Policy` Header**:
+   Microphone capture requires explicit origin delegation:
+   ```text
+   Permissions-Policy: microphone=(self)
+   ```

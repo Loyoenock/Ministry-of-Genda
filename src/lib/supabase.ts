@@ -197,6 +197,7 @@ export interface Database {
           completion_percentage: number;
           created_at: string;
           updated_at: string;
+          completed_at?: string | null;
         };
         Insert: {
           id?: string;
@@ -214,6 +215,7 @@ export interface Database {
           completion_percentage?: number;
           created_at?: string;
           updated_at?: string;
+          completed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -231,6 +233,7 @@ export interface Database {
           completion_percentage?: number;
           created_at?: string;
           updated_at?: string;
+          completed_at?: string | null;
         };
         Relationships: [];
       };

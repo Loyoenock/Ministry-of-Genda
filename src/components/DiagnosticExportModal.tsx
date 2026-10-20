@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useInterviewReport } from '../hooks/useInterviewReport';
 import { getQuestionsForTier } from '../lib/questionsService';
-import { generateDiagnosticBriefPdf } from '../lib/reportService';
+import { generateDiagnosticBriefPdf, downloadServerDiagnosticPdf } from '../lib/reportService';
 
 interface DiagnosticExportModalProps {
   interviewId: string;
@@ -77,7 +77,14 @@ export const DiagnosticExportModal: React.FC<DiagnosticExportModalProps> = ({
             </button>
 
             <button
-              onClick={() => reportData && generateDiagnosticBriefPdf(reportData)}
+              onClick={() => {
+                if (!reportData) return;
+                if (import.meta.env.VITE_ENABLE_SERVER_PDF === 'true') {
+                  downloadServerDiagnosticPdf(interviewId, reportData);
+                } else {
+                  generateDiagnosticBriefPdf(reportData);
+                }
+              }}
               disabled={loading || !reportData}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition min-h-[38px] cursor-pointer border border-slate-700 shadow-xs"
               title="Download standalone diagnostic brief dossier"
