@@ -11,6 +11,7 @@ export type LiveTranscriptionStatus =
   | 'connecting'
   | 'recording'
   | 'paused'
+  | 'reconnecting'
   | 'stopping'
   | 'completed'
   | 'failed';

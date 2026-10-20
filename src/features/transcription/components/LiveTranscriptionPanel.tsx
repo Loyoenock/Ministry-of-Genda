@@ -29,6 +29,7 @@ import {
 } from '../state/TranscriptionProvider';
 import { TranscriptionProvider as ITranscriptionProvider } from '../providers/types';
 import { SegmentWriter } from '../persistence/segmentWriter';
+import { AudioRingBuffer } from '../persistence/audioBuffer';
 import { ConsentModal } from './ConsentModal';
 import { AudioLevelMeter } from './AudioLevelMeter';
 import { TranscriptionErrorBoundary } from './TranscriptionErrorBoundary';
@@ -43,6 +44,7 @@ export interface LiveTranscriptionPanelProps {
   onInsertNote?: (text: string) => void;
   customProvider?: ITranscriptionProvider;
   customWriter?: SegmentWriter;
+  customAudioBuffer?: AudioRingBuffer;
   // Test injection / overrides
   interviewsOverride?: Interview[];
   tierQuestionsOverride?: Question[];
@@ -68,6 +70,15 @@ export function formatTranscriptMarker(startTimeSeconds: number): string {
   const mm = mins.toString().padStart(2, '0');
   const ss = secs.toString().padStart(2, '0');
   return `[Transcript ${mm}:${ss}]`;
+}
+
+/**
+ * Formats a gap marker segment when an outage exceeds the local ring buffer capacity.
+ */
+export function formatGapMarker(startTimeSeconds: number, endTimeSeconds: number): string {
+  const startStr = formatTime(Math.floor(startTimeSeconds));
+  const endStr = formatTime(Math.ceil(endTimeSeconds));
+  return `[audio not transcribed: ${startStr}–${endStr}]`;
 }
 
 /**
@@ -456,6 +467,7 @@ export const LiveTranscriptionInner: React.FC<LiveTranscriptionPanelProps> = ({
   const isPaused = status === 'paused';
   const isConnecting = status === 'connecting';
   const isStopping = status === 'stopping';
+  const isReconnecting = status === 'reconnecting';
   const isBusy = isConnecting || isStopping || isStarting;
 
   const displayedSegments = questionFilter
@@ -490,6 +502,8 @@ export const LiveTranscriptionInner: React.FC<LiveTranscriptionPanelProps> = ({
                     ? 'bg-amber-400'
                     : isConnecting
                     ? 'bg-sky-400 animate-ping'
+                    : isReconnecting
+                    ? 'bg-amber-400 animate-pulse'
                     : 'bg-emerald-400'
                 }`}
               />
@@ -502,6 +516,8 @@ export const LiveTranscriptionInner: React.FC<LiveTranscriptionPanelProps> = ({
                   ? 'Recording Live'
                   : status === 'paused'
                   ? 'Paused'
+                  : status === 'reconnecting'
+                  ? 'Reconnecting, audio is being kept'
                   : status === 'completed'
                   ? 'Finished'
                   : status === 'failed'
@@ -510,8 +526,10 @@ export const LiveTranscriptionInner: React.FC<LiveTranscriptionPanelProps> = ({
               </span>
             </div>
 
-            {/* Audio level meter when recording */}
-            {isRecording && <AudioLevelMeter level={level} isRecording={isRecording} />}
+            {/* Audio level meter when recording or reconnecting */}
+            {(isRecording || isReconnecting) && (
+              <AudioLevelMeter level={level} isRecording={isRecording || isReconnecting} />
+            )}
           </div>
 
           <div className="flex items-center space-x-1 shrink-0">
@@ -860,7 +878,7 @@ export const LiveTranscriptionInner: React.FC<LiveTranscriptionPanelProps> = ({
                 ) : (
                   <>
                     {/* Pause / Resume */}
-                    {isRecording && (
+                    {(isRecording || isReconnecting) && (
                       <button
                         type="button"
                         data-testid="transcription-pause-btn"
@@ -1029,6 +1047,7 @@ export const LiveTranscriptionPanel: React.FC<LiveTranscriptionPanelProps> = (pr
       <TranscriptionProvider
         provider={props.customProvider}
         segmentWriter={props.customWriter}
+        audioBuffer={props.customAudioBuffer}
       >
         <LiveTranscriptionInner {...props} />
       </TranscriptionProvider>

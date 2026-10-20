@@ -35,6 +35,8 @@ export class DeepgramSession implements Session {
   private finalHandlers: InterimFinalHandler[] = [];
   private errorHandlers: ErrorHandler[] = [];
   private closeHandlers: CloseHandler[] = [];
+  private reconnectingHandlers: (() => void)[] = [];
+  private reconnectedHandlers: (() => void)[] = [];
   private audioBuffer: Int16Array[] = [];
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempt = 0;
@@ -95,6 +97,9 @@ export class DeepgramSession implements Session {
 
       this.ws.onopen = () => {
         this.isConnecting = false;
+        if (this.reconnectAttempt > 0) {
+          this.reconnectedHandlers.forEach((h) => h());
+        }
         this.reconnectAttempt = 0;
         this.flushAudioBuffer();
       };
@@ -169,6 +174,7 @@ export class DeepgramSession implements Session {
     const exponential = this.baseDelay * Math.pow(2, this.reconnectAttempt);
     const delay = Math.min(this.maxDelay, exponential);
     this.reconnectAttempt++;
+    this.reconnectingHandlers.forEach((h) => h());
 
     this.reconnectTimeout = setTimeout(async () => {
       this.reconnectTimeout = null;
@@ -206,9 +212,10 @@ export class DeepgramSession implements Session {
   public on(event: 'interim' | 'final', handler: InterimFinalHandler): void;
   public on(event: 'error', handler: ErrorHandler): void;
   public on(event: 'close', handler: CloseHandler): void;
+  public on(event: 'reconnecting' | 'reconnected', handler: () => void): void;
   public on(
-    event: 'interim' | 'final' | 'error' | 'close',
-    handler: InterimFinalHandler | ErrorHandler | CloseHandler
+    event: 'interim' | 'final' | 'error' | 'close' | 'reconnecting' | 'reconnected',
+    handler: InterimFinalHandler | ErrorHandler | CloseHandler | (() => void)
   ): void {
     if (event === 'interim') {
       this.interimHandlers.push(handler as InterimFinalHandler);
@@ -218,6 +225,10 @@ export class DeepgramSession implements Session {
       this.errorHandlers.push(handler as ErrorHandler);
     } else if (event === 'close') {
       this.closeHandlers.push(handler as CloseHandler);
+    } else if (event === 'reconnecting') {
+      this.reconnectingHandlers.push(handler as () => void);
+    } else if (event === 'reconnected') {
+      this.reconnectedHandlers.push(handler as () => void);
     }
   }
 

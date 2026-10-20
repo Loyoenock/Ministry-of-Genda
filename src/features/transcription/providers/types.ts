@@ -16,12 +16,14 @@ export type TranscriptionEventType = 'interim' | 'final' | 'error' | 'close';
 export type InterimFinalHandler = (event: TranscriptionEvent) => void;
 export type ErrorHandler = (error: Error) => void;
 export type CloseHandler = () => void;
+export type ConnectionHandler = () => void;
 
 export interface Session {
   sendAudio(chunk: Int16Array): void;
   on(event: 'interim' | 'final', handler: InterimFinalHandler): void;
   on(event: 'error', handler: ErrorHandler): void;
   on(event: 'close', handler: CloseHandler): void;
+  on(event: 'reconnecting' | 'reconnected', handler: ConnectionHandler): void;
   close(): Promise<void> | void;
 }
 
@@ -110,21 +112,37 @@ export class FakeSession implements Session {
   private finalHandlers: InterimFinalHandler[] = [];
   private errorHandlers: ErrorHandler[] = [];
   private closeHandlers: CloseHandler[] = [];
+  private reconnectingHandlers: ConnectionHandler[] = [];
+  private reconnectedHandlers: ConnectionHandler[] = [];
   private timeouts: NodeJS.Timeout[] = [];
   private isClosed = false;
+  public audioChunksReceived: Int16Array[] = [];
 
   constructor(private script: ScriptedItem[]) {}
 
-  public sendAudio(_chunk: Int16Array): void {
+  public sendAudio(chunk: Int16Array): void {
     if (this.isClosed) {
       this.emitError(new Error('Cannot send audio on a closed session'));
       return;
     }
+    this.audioChunksReceived.push(chunk);
 
     // On receiving first audio chunk, trigger scripted sequence if not yet scheduled
     if (this.timeouts.length === 0 && this.script.length > 0) {
       this.schedulePlayback();
     }
+  }
+
+  public simulateDrop(): void {
+    this.reconnectingHandlers.forEach((h) => h());
+  }
+
+  public simulateReconnect(newScript?: ScriptedItem[]): void {
+    if (newScript) {
+      this.script = newScript;
+      this.schedulePlayback();
+    }
+    this.reconnectedHandlers.forEach((h) => h());
   }
 
   private schedulePlayback(): void {
@@ -153,9 +171,10 @@ export class FakeSession implements Session {
   public on(event: 'interim' | 'final', handler: InterimFinalHandler): void;
   public on(event: 'error', handler: ErrorHandler): void;
   public on(event: 'close', handler: CloseHandler): void;
+  public on(event: 'reconnecting' | 'reconnected', handler: ConnectionHandler): void;
   public on(
-    event: 'interim' | 'final' | 'error' | 'close',
-    handler: InterimFinalHandler | ErrorHandler | CloseHandler
+    event: 'interim' | 'final' | 'error' | 'close' | 'reconnecting' | 'reconnected',
+    handler: InterimFinalHandler | ErrorHandler | CloseHandler | ConnectionHandler
   ): void {
     if (event === 'interim') {
       this.interimHandlers.push(handler as InterimFinalHandler);
@@ -165,6 +184,10 @@ export class FakeSession implements Session {
       this.errorHandlers.push(handler as ErrorHandler);
     } else if (event === 'close') {
       this.closeHandlers.push(handler as CloseHandler);
+    } else if (event === 'reconnecting') {
+      this.reconnectingHandlers.push(handler as ConnectionHandler);
+    } else if (event === 'reconnected') {
+      this.reconnectedHandlers.push(handler as ConnectionHandler);
     }
   }
 

@@ -7,6 +7,7 @@ export {
   TranscriptPanel,
   LiveTranscriptionPanel,
   formatTranscriptMarker,
+  formatGapMarker,
   formatSegmentsWithMarkers,
   appendTranscriptToAnswer,
   appendTranscriptToObservations,
